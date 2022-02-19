@@ -8,6 +8,7 @@ XcbConnection :: struct {}
 
 XcbKeycode :: distinct u8
 XcbTimestamp :: distinct u32
+XcbAtom :: distinct u32
 
 XcbSetup :: struct {
   status: u8,
@@ -36,8 +37,13 @@ XcbDrawable :: distinct u32
 XcbWindow :: distinct u32
 XcbColorMap :: distinct u32
 XcbVisualId :: distinct u32
+XcbGContext :: distinct u32
 
 XcbVoidCookie :: struct {
+  sequence: u32,
+}
+
+XcbInternAtomCookie :: struct {
   sequence: u32,
 }
 
@@ -166,6 +172,108 @@ XcbKeyReleaseEvent :: distinct XcbKeyPressEvent
 
 XCB_CLIENT_MESSAGE : u8 : 33
 
+XcbClientMessageData :: struct #raw_union {
+  data8: [20]u8,
+  data16: [10]u16,
+  data32: [5]u32,
+}
+
+XcbClientMessageEvent :: struct {
+  response_type: u8,
+  format: u8,
+  sequence: u16,
+  window: XcbWindow,
+  type: XcbAtomEnum,
+  data: XcbClientMessageData,
+}
+
+XcbPropMode :: enum u8 {
+  Replace = 0,
+  Prepend = 1,
+  Append = 2,
+}
+
+XcbAtomEnum :: enum u32 {
+  None = 0,
+  Any = 0,
+  Primary = 1,
+  Secondary = 2,
+  Arc = 3,
+  Atom = 4,
+  Bitmap = 5,
+  Cardinal = 6,
+  Colormap = 7,
+  Cursor = 8,
+  Cut_Buffer0 = 9,
+  Cut_Buffer1 = 10,
+  Cut_Buffer2 = 11,
+  Cut_Buffer3 = 12,
+  Cut_Buffer4 = 13,
+  Cut_Buffer5 = 14,
+  Cut_Buffer6 = 15,
+  Cut_Buffer7 = 16,
+  Drawable = 17,
+  Font = 18,
+  Integer = 19,
+  Pixmap = 20,
+  Point = 21,
+  Rectangle = 22,
+  Resource_Manager = 23,
+  Rgb_Color_Map = 24,
+  Rgb_Best_Map = 25,
+  Rgb_Blue_Map = 26,
+  Rgb_Default_Map = 27,
+  Rgb_Gray_Map = 28,
+  Rgb_Green_Map = 29,
+  Rgb_Red_Map = 30,
+  String = 31,
+  Visualid = 32,
+  Window = 33,
+  Wm_Command = 34,
+  Wm_Hints = 35,
+  Wm_Client_Machine = 36,
+  Wm_Icon_Name = 37,
+  Wm_Icon_Size = 38,
+  Wm_Name = 39,
+  Wm_Normal_Hints = 40,
+  Wm_Size_Hints = 41,
+  Wm_Zoom_Hints = 42,
+  Min_Space = 43,
+  Norm_Space = 44,
+  Max_Space = 45,
+  End_Space = 46,
+  Superscript_X = 47,
+  Superscript_Y = 48,
+  Subscript_X = 49,
+  Subscript_Y = 50,
+  Underline_Position = 51,
+  Underline_Thickness = 52,
+  Strikeout_Ascent = 53,
+  Strikeout_Descent = 54,
+  Italic_Angle = 55,
+  X_Height = 56,
+  Quad_Width = 57,
+  Weight = 58,
+  Point_Size = 59,
+  Resolution = 60,
+  Copyright = 61,
+  Notice = 62,
+  Font_Name = 63,
+  Family_Name = 64,
+  Full_Name = 65,
+  Cap_Height = 66,
+  Wm_Class = 67,
+  Wm_Transient_For = 68,
+}
+
+XcbInternAtomReply :: struct {
+  response_type: u8,
+  pad0: u8,
+  sequence: u16,
+  length: u32,
+  atom: XcbAtom,
+}
+
 foreign import xcb "system:xcb"
 @(default_calling_convention="std")
 foreign xcb {
@@ -181,11 +289,25 @@ foreign xcb {
 
   xcb_create_window :: proc(
     connection: ^XcbConnection, depth: u8, window_id: XcbWindow, parent: XcbWindow,
-    x: i16, y: i16, width: u16, height: u16, border_width: u16, class: u16, visual: XcbVisualId,
+    x: i16, y: i16, width: u16, height: u16, border_width: u16, class: XcbWindowClass, visual: XcbVisualId,
     value_mask: u32, value_list: rawptr,
   ) -> XcbVoidCookie ---
   xcb_destroy_window :: proc(connection: ^XcbConnection, window: XcbWindow) -> XcbVoidCookie ---
   xcb_map_window :: proc(connection: ^XcbConnection, window: XcbWindow) -> XcbVoidCookie ---
+  xcb_change_property :: proc(
+    connection: ^XcbConnection, mode: XcbPropMode, window: XcbWindow,
+    property: XcbAtom, type: XcbAtomEnum, format: u8, data_len: u32, data: rawptr,
+  ) -> XcbVoidCookie ---
+  xcb_create_gc :: proc(
+    connection: ^XcbConnection, ctx_id: XcbGContext, drawable: XcbDrawable, value_mask: u32, value_list: rawptr,
+  ) -> XcbVoidCookie ---
+
+  xcb_intern_atom :: proc(
+    connection: ^XcbConnection, only_if_exists: u8, name_len: u16, name: cstring,
+  ) -> XcbInternAtomCookie ---
+  xcb_intern_atom_reply :: proc(
+    connection: ^XcbConnection, cookie: XcbInternAtomCookie, err: ^^XcbGenericError,
+  ) -> ^XcbInternAtomReply ---
 }
 
 XcbKeySymbols :: struct {}
@@ -199,7 +321,6 @@ foreign xcb_keysyms {
   xcb_key_press_lookup_keysym :: proc(symbols: ^XcbKeySymbols, event: ^XcbKeyPressEvent, col: i32) -> XcbKeySym ---
   xcb_key_release_lookup_keysym :: proc(symbols: ^XcbKeySymbols, event: ^XcbKeyReleaseEvent, col: i32) -> XcbKeySym ---
 }
-
 
 XcbErrorsContext :: struct {}
 
@@ -236,9 +357,17 @@ main :: proc() {
   xcb_create_window(
     connection, XCB_COPY_FROM_PARENT, window,
     screen.root, 0, 0, 1280, 720, 10,
-    u16(XcbWindowClass.Input_Output), screen.root_visual, mask, &values[0],
+    .Input_Output, screen.root_visual, mask, &values[0],
   )
   defer xcb_destroy_window(connection, window)
+
+  gcontext := XcbGContext(xcb_generate_id(connection))
+  xcb_create_gc(connection, gcontext, XcbDrawable(window), 0, nil)
+
+  // NOTE: Make sure we get the close window event (when letting decorations close the window etc).
+  protocol_reply := xcb_intern_atom_reply(connection, xcb_intern_atom(connection, 1, 12, "WM_PROTOCOLS"), nil)
+  delete_window_reply := xcb_intern_atom_reply(connection, xcb_intern_atom(connection, 0, 16, "WM_DELETE_WINDOW"), nil)
+  xcb_change_property(connection, .Replace, window, protocol_reply.atom, .Atom, 32, 1, &delete_window_reply.atom)
 
   xcb_map_window(connection, window)
   xcb_flush(connection)
@@ -284,9 +413,13 @@ main :: proc() {
 
         case XCB_CLIENT_MESSAGE:
           fmt.printf("XCB_CLIENT_MESSAGE\n")
+          evt := (^XcbClientMessageEvent)(event)
+          if evt.data.data32[0] == u32(delete_window_reply.atom) {
+            is_running = false
+          }
 
         case:
-          fmt.printf("woot\n")
+          fmt.printf("unexpected event %v\n", event)
       }
 
       libc.free(event)
