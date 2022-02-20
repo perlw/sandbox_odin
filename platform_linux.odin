@@ -38,6 +38,8 @@ XcbWindow :: distinct u32
 XcbColorMap :: distinct u32
 XcbVisualId :: distinct u32
 XcbGContext :: distinct u32
+XcbShmSeg :: distinct u32
+XcbPixmap :: distinct u32
 
 XcbVoidCookie :: struct {
   sequence: u32,
@@ -308,6 +310,8 @@ foreign xcb {
   xcb_intern_atom_reply :: proc(
     connection: ^XcbConnection, cookie: XcbInternAtomCookie, err: ^^XcbGenericError,
   ) -> ^XcbInternAtomReply ---
+
+  xcb_free_pixmap :: proc(connection: ^XcbConnection, pixmap: XcbPixmap) -> XcbVoidCookie ---
 }
 
 XcbKeySymbols :: struct {}
@@ -332,6 +336,64 @@ foreign xcb_errors {
   xcb_errors_get_name_for_minor_code :: proc(ctx: ^XcbErrorsContext, major_code: u8, minor_code: u16) -> cstring ---
   xcb_errors_get_name_for_error :: proc(ctx: ^XcbErrorsContext, error_code: u8, extension: ^cstring) -> cstring ---
   xcb_errors_context_free :: proc(ctx: ^XcbErrorsContext) ---
+}
+
+XcbShmQueryVersionCookie :: struct {
+  sequence: u32,
+}
+
+XcbShmQueryVersionReply :: struct {
+  response_type: u8,
+  shared_pixmaps: u8,
+  sequence: u16,
+  length: u32,
+  major_version: u16,
+  minor_version: u16,
+  uid: u16,
+  gid: u16,
+  pixmap_format: u8,
+  pad0: [15]u8,
+}
+
+foreign import xcb_shm "system:xcb-shm"
+@(default_calling_convention="std")
+foreign xcb_shm {
+  xcb_shm_query_version :: proc(connection: ^XcbConnection) -> XcbShmQueryVersionCookie ---
+  xcb_shm_query_version_reply :: proc(
+    connection: ^XcbConnection, cookie: XcbShmQueryVersionCookie, err: ^^XcbGenericError,
+  ) -> ^XcbShmQueryVersionReply ---
+  xcb_shm_attach :: proc(
+    connection: ^XcbConnection, shm_seg: XcbShmSeg, shm_id: u32, read_only: u8,
+  ) -> XcbVoidCookie ---
+  xcb_shm_detach :: proc(connection: ^XcbConnection, shm_seg: XcbShmSeg) -> XcbVoidCookie ---
+  xcb_shm_create_pixmap :: proc(
+    connection: ^XcbConnection, pixmap: XcbPixmap, drawable: XcbDrawable,
+    width: u16, height: u16, depth: u8, shm_seg: XcbShmSeg, offset: u32,
+  ) -> XcbVoidCookie ---
+}
+
+IPC_RMID :: 0x0
+IPC_PRIVATE :: 0x0
+
+S_IRUSR :: 0x00000100
+S_IWUSR :: 0x00000080
+S_IRGRP :: 0x00000020
+S_IWGRP :: 0x00000010
+S_IROTH :: 0x00000004
+S_IWOTH :: 0x00000002
+IPC_CREAT :: 0x00000200
+IPC_EXCL :: 0x00000400
+SHM_TS_NP :: 0x00010000
+SHM_RESIZE_NP :: 0x00040000
+SHM_MAP_FIXED_NP :: 0x00100000
+
+foreign import shm "system:c"
+@(default_calling_convention="std")
+foreign shm {
+  shmat :: proc(shm_id: i32, shm_addr: rawptr, shm_flag: i32) -> rawptr ---
+  shmctl :: proc(shm_id: i32, cmd: i32, buf: rawptr) -> i32 ---
+  shmdt :: proc(shm_addr: rawptr) -> i32 ---
+  shmget :: proc(key: u32, size: u32, shm_flag: i32) -> i32 ---
 }
 
 main :: proc() {
@@ -372,8 +434,32 @@ main :: proc() {
   xcb_map_window(connection, window)
   xcb_flush(connection)
 
+  // NOTE: SHM support check.
+  if reply := xcb_shm_query_version_reply(connection, xcb_shm_query_version(connection), nil); reply == nil || reply.shared_pixmaps == 0 {
+    fmt.printf("Shm missing?\n")
+  } else {
+    fmt.printf("Shm: %v\n", reply)
+  }
+
+  // TODO: const shmCompletionEvent = c.xcb_get_extension_data(connection, &c.xcb_shm_id).*.first_event + c.XCB_SHM_COMPLETION;
+
   key_syms := xcb_key_symbols_alloc(connection)
   defer xcb_key_symbols_free(key_syms)
+
+  shm_seg_id := XcbShmSeg(xcb_generate_id(connection))
+  pixmap_id := XcbPixmap(xcb_generate_id(connection))
+  bitmap_width := u16(1280)
+  bitmap_height := u16(720)
+  bitmap_bps := u16(4)
+  bitmap_pitch := bitmap_width * bitmap_height
+  shm_id := shmget(IPC_PRIVATE, u32(bitmap_bps * bitmap_pitch), IPC_CREAT | 0o600)
+  defer shmctl(shm_id, IPC_RMID, nil)
+  bitmap_memory := shmat(shm_id, nil, 0)
+  defer shmdt(bitmap_memory)
+  xcb_shm_attach(connection, shm_seg_id, u32(shm_id), 0)
+  defer xcb_shm_detach(connection, shm_seg_id)
+  xcb_shm_create_pixmap(connection, pixmap_id, XcbDrawable(window), bitmap_width, bitmap_height, screen.root_depth, shm_seg_id, 0)
+  defer xcb_free_pixmap(connection, pixmap_id)
 
   is_running := true
   for is_running {
