@@ -13,7 +13,8 @@ window_proc :: proc "std" (
 	msg: u32,
 	wparam: win32.Wparam,
 	lparam: win32.Lparam,
-) -> win32.Lresult {result: win32.Lresult
+) -> win32.Lresult {
+	result: win32.Lresult
 
 	switch msg {
 	case win32.WM_DESTROY:
