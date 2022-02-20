@@ -18,7 +18,8 @@ window_proc :: proc "std" (
 
 	switch msg {
 	case win32.WM_DESTROY:
-		global_is_running = false;win32.output_debug_string_a("WM_DESTROY\n")
+		global_is_running = false
+		win32.output_debug_string_a("WM_DESTROY\n")
 
 	case win32.WM_CLOSE:
 		global_is_running = false
