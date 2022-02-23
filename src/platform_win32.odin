@@ -54,7 +54,7 @@ resize_backbuffer :: proc(backbuffer: ^Backbuffer, width: u32, height: u32) {
 	backbuffer.bitmap_info.header = {
 		size        = size_of(backbuffer.bitmap_info.header),
 		width       = i32(width),
-		height      = i32(height),
+		height      = -i32(height),
 		planes      = 1,
 		bit_count   = 32,
 		compression = win32.BI_RGB,
