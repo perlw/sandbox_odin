@@ -1,7 +1,7 @@
+//+build windows
 package main
 
 import "core:fmt"
-
 import "core:sys/win32"
 
 WIN32_CLASS_NAME :: cstring("sandboxwin32platform_odin")
@@ -30,6 +30,42 @@ window_proc :: proc "std" (
 	}
 
 	return result
+}
+
+Backbuffer :: struct {
+	memory:      rawptr,
+	bitmap_info: win32.Bitmap_Info,
+	width:       u32,
+	height:      u32,
+	bps:         u32,
+	pitch:       u32,
+}
+
+resize_backbuffer :: proc(backbuffer: ^Backbuffer, width: u32, height: u32) {
+	if backbuffer.memory != nil {
+		win32.virtual_free(backbuffer.memory, 0, win32.MEM_RELEASE)
+	}
+
+	backbuffer.width = width
+	backbuffer.height = height
+	backbuffer.bps = 4
+	backbuffer.pitch = width * height
+
+	backbuffer.bitmap_info.header = {
+		size        = size_of(backbuffer.bitmap_info.header),
+		width       = i32(width),
+		height      = i32(height),
+		planes      = 1,
+		bit_count   = 32,
+		compression = win32.BI_RGB,
+	}
+
+	backbuffer.memory = win32.virtual_alloc(
+		nil,
+		uint(backbuffer.bps * backbuffer.pitch),
+		win32.MEM_RESERVE | win32.MEM_COMMIT,
+		win32.PAGE_READWRITE,
+	)
 }
 
 main :: proc() {
@@ -73,12 +109,17 @@ main :: proc() {
 		nil,
 	)
 
-
 	if window == nil {
 		win32.output_debug_string_a("could not create window\n")
 		return
 	}
 	defer win32.destroy_window(window)
+
+	backbuffer: Backbuffer
+	fmt.printf("backbuffer: %+v\n", backbuffer)
+	resize_backbuffer(&backbuffer, 1280, 720)
+	defer win32.virtual_free(backbuffer.memory, 0, win32.MEM_RELEASE)
+	fmt.printf("backbuffer: %+v\n", backbuffer)
 
 	for global_is_running {
 		message: win32.Msg
@@ -99,5 +140,43 @@ main :: proc() {
 				win32.dispatch_message_a(&message)
 			}
 		}
+
+		screen_buffer := Bitmap {
+			buffer = ([^]u32)(backbuffer.memory)[0:backbuffer.pitch],
+			width  = backbuffer.width,
+			height = backbuffer.height,
+		}
+		app_update_and_render(&screen_buffer)
+
+		client_rect: win32.Rect
+		win32.get_client_rect(window, &client_rect)
+		dim_width := client_rect.right - client_rect.left
+		dim_height := client_rect.bottom - client_rect.top
+		ratio: f32 : 16.0 / 9.0
+		fixed_width := i32(f32(dim_height) * ratio)
+		offset_x := (dim_width - fixed_width) / 2
+		dc := win32.get_dc(window)
+
+		if fixed_width != dim_width {
+			win32.pat_blt(dc, 0, 0, offset_x, dim_height, win32.BLACKNESS)
+			win32.pat_blt(dc, dim_width - offset_x, 0, offset_x, dim_height, win32.BLACKNESS)
+		}
+		win32.stretch_dibits(
+			dc,
+			offset_x,
+			0,
+			fixed_width,
+			dim_height,
+			0,
+			0,
+			i32(backbuffer.width),
+			i32(backbuffer.height),
+			backbuffer.memory,
+			&backbuffer.bitmap_info,
+			win32.DIB_RGB_COLORS,
+			win32.SRCCOPY,
+		)
+
+		win32.release_dc(window, dc)
 	}
 }
