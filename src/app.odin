@@ -12,5 +12,5 @@ app_update_and_render :: proc(screen_buffer: ^Bitmap) {
 		}
 	}
 
-	offset += 2
+	offset += 4
 }

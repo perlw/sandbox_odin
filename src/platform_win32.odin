@@ -68,11 +68,64 @@ resize_backbuffer :: proc(backbuffer: ^Backbuffer, width: u32, height: u32) {
 	)
 }
 
+get_clock_value :: #force_inline proc() -> i64 {
+	result: i64
+	win32.query_performance_counter(&result)
+	return result
+}
+
+global_perf_count_frequency: i64
+
+get_seconds_elapsed :: #force_inline proc(start, end: i64) -> f32 {
+	return f32(end - start) / f32(global_perf_count_frequency)
+}
+
+blit_buffer_in_window :: proc(backbuffer: ^Backbuffer, dc: win32.Hdc, width, height: i32) {
+	ratio: f32 : 16.0 / 9.0
+	fixed_width := i32(f32(height) * ratio)
+	offset_x := (width - fixed_width) / 2
+
+	if fixed_width != width {
+		win32.pat_blt(dc, 0, 0, offset_x, height, win32.BLACKNESS)
+		win32.pat_blt(dc, width - offset_x, 0, offset_x, height, win32.BLACKNESS)
+	}
+	win32.stretch_dibits(
+		dc,
+		offset_x,
+		0,
+		fixed_width,
+		height,
+		0,
+		0,
+		i32(backbuffer.width),
+		i32(backbuffer.height),
+		backbuffer.memory,
+		&backbuffer.bitmap_info,
+		win32.DIB_RGB_COLORS,
+		win32.SRCCOPY,
+	)
+}
+
+TIMERR_BASE :: 96
+TIMERR_NOCANDO :: TIMERR_BASE + 1
+TIMERR_NOERROR :: 0
+
 main :: proc() {
 	fmt.println("Hellope!")
 
 	hinstance := win32.get_module_handle_a(nil)
 	fmt.printf("hinstance %x\n", hinstance)
+
+	global_perf_count_frequency = win32.get_query_performance_frequency()
+	fmt.printf("perf_count_frequency: %d\n", global_perf_count_frequency)
+
+	sleep_is_granular := (win32.time_begin_period(1) == TIMERR_NOERROR)
+	if sleep_is_granular {
+		fmt.printf("-=sleep is granular=-\n")
+	}
+
+	game_update_hz := f32(30)
+	target_seconds_per_frame := 1.0 / game_update_hz
 
 	window_class := win32.Wnd_Class_A {
 		style      = win32.CS_OWNDC | win32.CS_HREDRAW | win32.CS_VREDRAW,
@@ -121,6 +174,10 @@ main :: proc() {
 	defer win32.virtual_free(backbuffer.memory, 0, win32.MEM_RELEASE)
 	fmt.printf("backbuffer: %+v\n", backbuffer)
 
+	last_counter := get_clock_value()
+	ms_per_frame: f32
+	second: f32
+
 	for global_is_running {
 		message: win32.Msg
 		for win32.peek_message_a(&message, window, 0, 0, win32.PM_REMOVE) {
@@ -148,35 +205,34 @@ main :: proc() {
 		}
 		app_update_and_render(&screen_buffer)
 
+		dc := win32.get_dc(window)
 		client_rect: win32.Rect
 		win32.get_client_rect(window, &client_rect)
 		dim_width := client_rect.right - client_rect.left
 		dim_height := client_rect.bottom - client_rect.top
-		ratio: f32 : 16.0 / 9.0
-		fixed_width := i32(f32(dim_height) * ratio)
-		offset_x := (dim_width - fixed_width) / 2
-		dc := win32.get_dc(window)
-
-		if fixed_width != dim_width {
-			win32.pat_blt(dc, 0, 0, offset_x, dim_height, win32.BLACKNESS)
-			win32.pat_blt(dc, dim_width - offset_x, 0, offset_x, dim_height, win32.BLACKNESS)
-		}
-		win32.stretch_dibits(
-			dc,
-			offset_x,
-			0,
-			fixed_width,
-			dim_height,
-			0,
-			0,
-			i32(backbuffer.width),
-			i32(backbuffer.height),
-			backbuffer.memory,
-			&backbuffer.bitmap_info,
-			win32.DIB_RGB_COLORS,
-			win32.SRCCOPY,
-		)
-
+		blit_buffer_in_window(&backbuffer, dc, dim_width, dim_height)
 		win32.release_dc(window, dc)
+
+		elapsed := get_seconds_elapsed(last_counter, get_clock_value())
+		if elapsed < target_seconds_per_frame {
+			if sleep_is_granular {
+				sleep_ms := u32(1000 * (target_seconds_per_frame - elapsed))
+				if sleep_ms > 0 {
+					win32.sleep(sleep_ms)
+				}
+			}
+
+			for elapsed < target_seconds_per_frame {
+				elapsed = get_seconds_elapsed(last_counter, get_clock_value())
+			}
+		}
+		end_counter := get_clock_value()
+		ms_per_frame = 1000.0 * get_seconds_elapsed(last_counter, end_counter)
+		second += get_seconds_elapsed(last_counter, end_counter)
+		if second > 1 {
+			second = 0
+			fmt.printf("last. ms/frame: %f\n", ms_per_frame)
+		}
+		last_counter = end_counter
 	}
 }
