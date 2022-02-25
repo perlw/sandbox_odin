@@ -203,7 +203,9 @@ main :: proc() {
 			width  = backbuffer.width,
 			height = backbuffer.height,
 		}
+		update_and_render_timing_start := get_clock_value()
 		app_update_and_render(&screen_buffer)
+		update_and_render_timing_end := get_clock_value()
 
 		dc := win32.get_dc(window)
 		client_rect: win32.Rect
@@ -225,14 +227,20 @@ main :: proc() {
 			for elapsed < target_seconds_per_frame {
 				elapsed = get_seconds_elapsed(last_counter, get_clock_value())
 			}
+		} else {
+			fmt.printf("missed sleep\n")
 		}
 		end_counter := get_clock_value()
 		ms_per_frame = 1000.0 * get_seconds_elapsed(last_counter, end_counter)
 		second += get_seconds_elapsed(last_counter, end_counter)
+		last_counter = end_counter
 		if second > 1 {
 			second = 0
 			fmt.printf("last. ms/frame: %f\n", ms_per_frame)
+			fmt.printf(
+				"last. ms/render: %f\n",
+				1000.0 * get_seconds_elapsed(update_and_render_timing_start, update_and_render_timing_end),
+			)
 		}
-		last_counter = end_counter
 	}
 }
