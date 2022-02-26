@@ -269,12 +269,35 @@ XcbAtomEnum :: enum u32 {
 	Wm_Transient_For    = 68,
 }
 
-XcbInternAtomReply :: struct {
+XcbBaseReply :: struct {
 	response_type: u8,
 	pad0:          u8,
 	sequence:      u16,
 	length:        u32,
-	atom:          XcbAtom,
+}
+
+XcbInternAtomReply :: struct {
+	using base: XcbBaseReply,
+	atom:       XcbAtom,
+}
+
+XcbExtension :: struct {
+	name:      cstring,
+	global_id: i32,
+}
+
+XcbQueryExtensionReply :: struct {
+	using base: XcbBaseReply,
+	present:       u8,
+	major_opcode:  u8,
+	first_event:   u8,
+	first_error:   u8,
+}
+
+XcbImageFormat :: enum u8 {
+	xy_bitmap = 0,
+	xy_pixmap = 1,
+	z_pixmap  = 2,
 }
 
 foreign import xcb "system:xcb"
@@ -338,6 +361,8 @@ foreign xcb {
 	) -> ^XcbInternAtomReply ---
 
 	xcb_free_pixmap :: proc(connection: ^XcbConnection, pixmap: XcbPixmap) -> XcbVoidCookie ---
+
+	xcb_get_extension_data :: proc(connection: ^XcbConnection, ext: ^XcbExtension) -> ^XcbQueryExtensionReply ---
 }
 
 XcbKeySymbols :: struct {}
@@ -397,6 +422,13 @@ XcbShmQueryVersionReply :: struct {
 	pad0:           [15]u8,
 }
 
+xcb_shm_id := XcbExtension {
+	name      = "MIT-SHM",
+	global_id = 0,
+}
+
+XCB_SHM_COMPLETION :: 0
+
 foreign import xcb_shm "system:xcb-shm"
 @(default_calling_convention = "std")
 foreign xcb_shm {
@@ -420,6 +452,24 @@ foreign xcb_shm {
 		width: u16,
 		height: u16,
 		depth: u8,
+		shm_seg: XcbShmSeg,
+		offset: u32,
+	) -> XcbVoidCookie ---
+	xcb_shm_put_image :: proc(
+		connection: ^XcbConnection,
+		drawable: XcbDrawable,
+		gc: XcbGContext,
+		total_width: u16,
+		total_height: u16,
+		src_x: u16,
+		src_y: u16,
+		src_width: u16,
+		src_height: u16,
+		dst_x: u16,
+		dst_y: u16,
+		depth: u8,
+		format: XcbImageFormat,
+		send_event: u8,
 		shm_seg: XcbShmSeg,
 		offset: u32,
 	) -> XcbVoidCookie ---
@@ -447,6 +497,52 @@ foreign shm {
 	shmctl :: proc(shm_id: i32, cmd: i32, buf: rawptr) -> i32 ---
 	shmdt :: proc(shm_addr: rawptr) -> i32 ---
 	shmget :: proc(key: u32, size: u32, shm_flag: i32) -> i32 ---
+}
+
+// TODO: Improve with create/destroy etc.
+Backbuffer :: struct {
+	memory:      rawptr,
+	shm_seg_id:  XcbShmSeg,
+	pixmap_id:   XcbPixmap,
+	shm_id:      i32,
+	width:       u16,
+	height:      u16,
+	bps:         u32,
+	pitch:       u32,
+}
+
+resize_backbuffer :: proc(backbuffer: ^Backbuffer, connection: ^XcbConnection, window: XcbWindow, width: u32, height: u32) {
+	if backbuffer.shm_seg_id == 0 {
+		backbuffer.shm_seg_id = XcbShmSeg(xcb_generate_id(connection))
+		backbuffer.pixmap_id = XcbPixmap(xcb_generate_id(connection))
+	} else {
+		shmctl(backbuffer.shm_id, IPC_RMID, nil)
+		shmdt(backbuffer.memory)
+		xcb_shm_detach(connection, backbuffer.shm_seg_id)
+		xcb_free_pixmap(connection, backbuffer.pixmap_id)
+	}
+	xcb_flush(connection)
+
+	backbuffer.width = 1280
+	backbuffer.height = 720
+	backbuffer.bps = 4
+	backbuffer.pitch = u32(backbuffer.width) * u32(backbuffer.height)
+
+	backbuffer.shm_id = shmget(IPC_PRIVATE, u32(backbuffer.bps * backbuffer.pitch), IPC_CREAT | 0o600)
+	backbuffer.memory = shmat(backbuffer.shm_id, nil, 0)
+
+	xcb_shm_attach(connection, backbuffer.shm_seg_id, u32(backbuffer.shm_id), 0)
+	screen := xcb_setup_roots_iterator(xcb_get_setup(connection)).data
+	xcb_shm_create_pixmap(
+		connection,
+		backbuffer.pixmap_id,
+		XcbDrawable(window),
+		backbuffer.width,
+		backbuffer.height,
+		screen.root_depth,
+		backbuffer.shm_seg_id,
+		0,
+	)
 }
 
 main :: proc() {
@@ -525,37 +621,25 @@ main :: proc() {
 		fmt.printf("Shm: %v\n", reply)
 	}
 
-	// TODO: const shmCompletionEvent = c.xcb_get_extension_data(connection, &c.xcb_shm_id).*.first_event + c.XCB_SHM_COMPLETION;
-
 	key_syms := xcb_key_symbols_alloc(connection)
 	defer xcb_key_symbols_free(key_syms)
 
-	shm_seg_id := XcbShmSeg(xcb_generate_id(connection))
-	pixmap_id := XcbPixmap(xcb_generate_id(connection))
-	bitmap_width := u16(1280)
-	bitmap_height := u16(720)
-	bitmap_bps := u16(4)
-	bitmap_pitch := bitmap_width * bitmap_height
-	shm_id := shmget(IPC_PRIVATE, u32(bitmap_bps * bitmap_pitch), IPC_CREAT | 0o600)
-	defer shmctl(shm_id, IPC_RMID, nil)
-	bitmap_memory := shmat(shm_id, nil, 0)
-	defer shmdt(bitmap_memory)
-	xcb_shm_attach(connection, shm_seg_id, u32(shm_id), 0)
-	defer xcb_shm_detach(connection, shm_seg_id)
-	xcb_shm_create_pixmap(
-		connection,
-		pixmap_id,
-		XcbDrawable(window),
-		bitmap_width,
-		bitmap_height,
-		screen.root_depth,
-		shm_seg_id,
-		0,
-	)
-	defer xcb_free_pixmap(connection, pixmap_id)
+	backbuffer: Backbuffer
+	fmt.printf("backbuffer: %+v\n", backbuffer)
+	resize_backbuffer(&backbuffer, connection, window, 1280, 720)
+	defer shmctl(backbuffer.shm_id, IPC_RMID, nil)
+	defer shmdt(backbuffer.memory)
+	defer xcb_shm_detach(connection, backbuffer.shm_seg_id)
+	defer xcb_free_pixmap(connection, backbuffer.pixmap_id)
+	fmt.printf("backbuffer: %+v\n", backbuffer)
+
+	shm_completion_event := xcb_get_extension_data(connection, &xcb_shm_id).first_event + XCB_SHM_COMPLETION
+	fmt.printf("completion event: %d\n", shm_completion_event)
 
 	is_running := true
+	ready_to_blit := true
 	for is_running {
+
 		event: ^XcbGenericEvent = xcb_poll_for_event(connection)
 		for ; event != nil; event = xcb_poll_for_event(connection) {
 			switch (event.response_type & ~u8(0x80)) {
@@ -601,11 +685,47 @@ main :: proc() {
 					is_running = false
 				}
 
+			case shm_completion_event:
+				ready_to_blit = true
+
 			case:
 				fmt.printf("unexpected event %v\n", event)
 			}
 
+
 			libc.free(event)
+		}
+
+		screen_buffer := Bitmap {
+			buffer = ([^]u32)(backbuffer.memory)[0:backbuffer.pitch],
+			width  = u32(backbuffer.width),
+			height = u32(backbuffer.height),
+		}
+		app_update_and_render(&screen_buffer)
+
+		if ready_to_blit {
+			ready_to_blit = false
+
+			xcb_shm_put_image(
+				connection,
+				XcbDrawable(window),
+				gcontext,
+				backbuffer.width,
+				backbuffer.height,
+				0,
+				0,
+				backbuffer.width,
+				backbuffer.height,
+				0,
+				0,
+				screen.root_depth,
+				.z_pixmap,
+				1,
+				backbuffer.shm_seg_id,
+				0,
+			)
+
+			xcb_flush(connection)
 		}
 	}
 }
