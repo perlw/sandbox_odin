@@ -19,11 +19,10 @@ MAP_FIXED_NP :: 0x00100000
 
 foreign import shm "system:c"
 @(default_calling_convention = "std")
-@(link_prefix="shm")
+@(link_prefix = "shm")
 foreign shm {
 	at :: proc(shm_id: i32, shm_addr: rawptr, shm_flag: i32) -> rawptr ---
 	ctl :: proc(shm_id: i32, cmd: i32, buf: rawptr) -> i32 ---
 	dt :: proc(shm_addr: rawptr) -> i32 ---
 	get :: proc(key: u32, size: u32, shm_flag: i32) -> i32 ---
 }
-

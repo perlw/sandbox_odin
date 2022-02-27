@@ -20,17 +20,23 @@ DEBUG_DRAW_TIMINGS :: #config(DEBUG_DRAW_TIMINGS, false)
 
 // TODO: Improve with create/destroy etc.
 Backbuffer :: struct {
-	memory:      rawptr,
-	shm_seg_id:  xcbshm.Seg,
-	pixmap_id:   xcb.Pixmap,
-	shm_id:      i32,
-	width:       u16,
-	height:      u16,
-	bps:         u32,
-	pitch:       u32,
+	memory:     rawptr,
+	shm_seg_id: xcbshm.Seg,
+	pixmap_id:  xcb.Pixmap,
+	shm_id:     i32,
+	width:      u16,
+	height:     u16,
+	bps:        u32,
+	pitch:      u32,
 }
 
-resize_backbuffer :: proc(backbuffer: ^Backbuffer, connection: ^xcb.Connection, window: xcb.Window, width, height: u32) {
+resize_backbuffer :: proc(
+	backbuffer: ^Backbuffer,
+	connection: ^xcb.Connection,
+	window: xcb.Window,
+	width,
+	height: u32,
+) {
 	if backbuffer.shm_seg_id == 0 {
 		backbuffer.shm_seg_id = xcbshm.Seg(xcb.generate_id(connection))
 		backbuffer.pixmap_id = xcb.Pixmap(xcb.generate_id(connection))
@@ -47,7 +53,11 @@ resize_backbuffer :: proc(backbuffer: ^Backbuffer, connection: ^xcb.Connection, 
 	backbuffer.bps = 4
 	backbuffer.pitch = u32(backbuffer.width) * u32(backbuffer.height)
 
-	backbuffer.shm_id = shm.get(shm.IPC_PRIVATE, u32(backbuffer.bps * backbuffer.pitch), shm.IPC_CREAT | 0o600)
+	backbuffer.shm_id = shm.get(
+		shm.IPC_PRIVATE,
+		u32(backbuffer.bps * backbuffer.pitch),
+		shm.IPC_CREAT | 0o600,
+	)
 	backbuffer.memory = shm.at(backbuffer.shm_id, nil, 0)
 
 	xcbshm.attach(connection, backbuffer.shm_seg_id, u32(backbuffer.shm_id), 0)
@@ -69,7 +79,7 @@ get_clock_value :: #force_inline proc() -> time.TimeSpec {
 }
 
 get_seconds_elapsed :: #force_inline proc(start, end: time.TimeSpec) -> f32 {
-  return f32(end.tv_sec - start.tv_sec) + (f32(end.tv_nsec - start.tv_nsec) / 1000000000.0)
+	return f32(end.tv_sec - start.tv_sec) + (f32(end.tv_nsec - start.tv_nsec) / 1000000000.0)
 }
 
 main :: proc() {
@@ -88,8 +98,8 @@ main :: proc() {
 	window := xcb.Window(xcb.generate_id(connection))
 	fmt.printf("window %v\n", window)
 
-	mask : u32
-	values : [2]u32
+	mask: u32
+	values: [2]u32
 	mask = u32(xcb.Cw.Event_Mask)
 	values[0] = u32(xcb.EventMask.Exposure | xcb.EventMask.Key_Press | xcb.EventMask.Key_Release)
 	xcb.create_window(
@@ -151,7 +161,7 @@ main :: proc() {
 	key_syms := xcbkeysyms.symbols_alloc(connection)
 	defer xcbkeysyms.symbols_free(key_syms)
 
-	backbuffer : Backbuffer
+	backbuffer: Backbuffer
 	fmt.printf("backbuffer: %+v\n", backbuffer)
 	resize_backbuffer(&backbuffer, connection, window, 1280, 720)
 	defer shm.ctl(backbuffer.shm_id, shm.IPC_RMID, nil)
@@ -168,8 +178,8 @@ main :: proc() {
 	last_counter := get_clock_value()
 
 	when DEBUG_DRAW_TIMINGS {
-		debug_frame_timings : [256]f32
-		debug_render_timings : [256]f32
+		debug_frame_timings: [256]f32
+		debug_render_timings: [256]f32
 		debug_highest_timing := f32(1)
 	}
 
@@ -181,11 +191,11 @@ main :: proc() {
 			switch (event.response_type & ~u8(0x80)) {
 			case 0:
 				err := (^xcb.GenericError)(event)
-				err_ctx : ^xcberrors.Context
+				err_ctx: ^xcberrors.Context
 				xcberrors.context_new(connection, &err_ctx)
 				major := xcberrors.get_name_for_major_code(err_ctx, u8(err.major_code))
 				minor := xcberrors.get_name_for_minor_code(err_ctx, u8(err.major_code), err.minor_code)
-				extension : cstring
+				extension: cstring
 				error := xcberrors.get_name_for_error(err_ctx, err.error_code, &extension)
 				fmt.printf(
 					"XCB Error: %s:%s, %s:%s, resource %u sequence %u\n",
@@ -249,8 +259,8 @@ main :: proc() {
 			target_ms := 1000 * target_seconds_per_frame
 			target_ms_line := int(((target_ms * (target_ms / debug_highest_timing)) * pix_step) + 0.5)
 			for x := 0; x < 256; x += 1 {
-				frame_height : int
-				render_height : int
+				frame_height: int
+				render_height: int
 				{
 					scaling := debug_frame_timings[x] / debug_highest_timing
 					frame_height = int(((debug_frame_timings[x] * scaling) * pix_step) + 0.5)
@@ -263,7 +273,7 @@ main :: proc() {
 				for y := 0; y < 128; y += 1 {
 					i := ((127 - y) * int(screen_buffer.width)) + x
 
-					c : u32 = 0xFF000000
+					c: u32 = 0xFF000000
 					if y == target_ms_line {
 						c = 0xFFFF00FF
 					} else if y <= render_height {
@@ -323,7 +333,10 @@ main :: proc() {
 
 		when DEBUG_DRAW_TIMINGS {
 			ms_per_frame := 1000.0 * get_seconds_elapsed(last_counter, end_counter)
-			frame_render_ms := 1000.0 * get_seconds_elapsed(update_and_render_timing_start, update_and_render_timing_stop)
+			frame_render_ms := 1000.0 * get_seconds_elapsed(
+	                      update_and_render_timing_start,
+	                      update_and_render_timing_stop,
+                      )
 
 			debug_highest_timing = 0
 			for i := 0; i < 255; i += 1 {

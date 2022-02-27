@@ -69,19 +69,19 @@ resize_backbuffer :: proc(backbuffer: ^Backbuffer, width: u32, height: u32) {
 }
 
 get_clock_value :: #force_inline proc() -> i64 {
-	result : i64
+	result: i64
 	win32.query_performance_counter(&result)
 	return result
 }
 
-global_perf_count_frequency : i64
+global_perf_count_frequency: i64
 
 get_seconds_elapsed :: #force_inline proc(start, end: i64) -> f32 {
 	return f32(end - start) / f32(global_perf_count_frequency)
 }
 
 blit_buffer_in_window :: proc(backbuffer: ^Backbuffer, dc: win32.Hdc, width, height: i32) {
-	ratio : f32 : 16.0 / 9.0
+	ratio: f32 : 16.0 / 9.0
 	fixed_width := i32(f32(height) * ratio)
 	offset_x := (width - fixed_width) / 2
 
@@ -165,7 +165,7 @@ main :: proc() {
 	}
 	defer win32.destroy_window(window)
 
-	backbuffer : Backbuffer
+	backbuffer: Backbuffer
 	fmt.printf("backbuffer: %+v\n", backbuffer)
 	resize_backbuffer(&backbuffer, 1280, 720)
 	defer win32.virtual_free(backbuffer.memory, 0, win32.MEM_RELEASE)
@@ -174,11 +174,11 @@ main :: proc() {
 	game_update_hz := f32(30)
 	target_seconds_per_frame := 1.0 / game_update_hz
 	last_counter := get_clock_value()
-	ms_per_frame : f32
-	second : f32
+	ms_per_frame: f32
+	second: f32
 
 	for global_is_running {
-		message : win32.Msg
+		message: win32.Msg
 		for win32.peek_message_a(&message, window, 0, 0, win32.PM_REMOVE) {
 			switch message.message {
 			case win32.WM_QUIT:
@@ -207,7 +207,7 @@ main :: proc() {
 		update_and_render_timing_end := get_clock_value()
 
 		dc := win32.get_dc(window)
-		client_rect : win32.Rect
+		client_rect: win32.Rect
 		win32.get_client_rect(window, &client_rect)
 		dim_width := client_rect.right - client_rect.left
 		dim_height := client_rect.bottom - client_rect.top

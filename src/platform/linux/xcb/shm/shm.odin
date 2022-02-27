@@ -30,7 +30,7 @@ COMPLETION :: 0
 
 foreign import xcb_shm "system:xcb-shm"
 @(default_calling_convention = "std")
-@(link_prefix="xcb_shm_")
+@(link_prefix = "xcb_shm_")
 foreign xcb_shm {
 	query_version :: proc(connection: ^xcb.Connection) -> QueryVersionCookie ---
 	query_version_reply :: proc(

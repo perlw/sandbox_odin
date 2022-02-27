@@ -1,14 +1,14 @@
 package xcb
 
-Keycode   :: distinct u8
+Keycode :: distinct u8
 Timestamp :: distinct u32
-Atom      :: distinct u32
-Drawable  :: distinct u32
-Window    :: distinct u32
-Colormap  :: distinct u32
-Visualid  :: distinct u32
-Gcontext  :: distinct u32
-Pixmap    :: distinct u32
+Atom :: distinct u32
+Drawable :: distinct u32
+Window :: distinct u32
+Colormap :: distinct u32
+Visualid :: distinct u32
+Gcontext :: distinct u32
+Pixmap :: distinct u32
 
 Connection :: struct {}
 
@@ -113,10 +113,10 @@ EventMask :: enum u32 {
 	Owner_Grab_Button     = 16777216,
 }
 
-KEY_PRESS      : u8 : 2
-KEY_RELEASE    : u8 : 3
-EXPOSE         : u8 : 12
-CLIENT_MESSAGE : u8 : 33
+KEY_PRESS: u8 : 2
+KEY_RELEASE: u8 : 3
+EXPOSE: u8 : 12
+CLIENT_MESSAGE: u8 : 33
 
 KeyPressEvent :: struct {
 	response_type: u8,
@@ -248,11 +248,11 @@ Extension :: struct {
 }
 
 QueryExtensionReply :: struct {
-	using base: BaseReply,
-	present:       u8,
-	major_opcode:  u8,
-	first_event:   u8,
-	first_error:   u8,
+	using base:   BaseReply,
+	present:      u8,
+	major_opcode: u8,
+	first_event:  u8,
+	first_error:  u8,
 }
 
 ImageFormat :: enum u8 {
@@ -263,7 +263,7 @@ ImageFormat :: enum u8 {
 
 foreign import xproto "system:xcb"
 @(default_calling_convention = "std")
-@(link_prefix="xcb_")
+@(link_prefix = "xcb_")
 foreign xproto {
 	setup_roots_iterator :: proc(setup: ^Setup) -> ScreenIterator ---
 

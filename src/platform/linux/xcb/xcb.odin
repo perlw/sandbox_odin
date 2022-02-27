@@ -1,6 +1,6 @@
 package xcb
 
-COPY_FROM_PARENT : u8 : 0
+COPY_FROM_PARENT: u8 : 0
 
 VoidCookie :: struct {
 	sequence: u32,
@@ -32,7 +32,7 @@ GenericEvent :: struct {
 
 foreign import xcb "system:xcb"
 @(default_calling_convention = "std")
-@(link_prefix="xcb_")
+@(link_prefix = "xcb_")
 foreign xcb {
 	connect :: proc(display_name: cstring, screen_p: ^u32) -> ^Connection ---
 	disconnect :: proc(connection: ^Connection) ---
@@ -45,4 +45,3 @@ foreign xcb {
 
 	get_extension_data :: proc(connection: ^Connection, ext: ^Extension) -> ^QueryExtensionReply ---
 }
-
