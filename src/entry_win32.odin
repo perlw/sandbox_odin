@@ -4,6 +4,8 @@ package main
 import "core:fmt"
 import "core:sys/win32"
 
+DEBUG_DRAW_TIMINGS :: #config(DEBUG_DRAW_TIMINGS, false)
+
 WIN32_CLASS_NAME :: cstring("sandboxwin32platform_odin")
 
 global_is_running := true
@@ -174,8 +176,12 @@ main :: proc() {
 	game_update_hz := f32(30)
 	target_seconds_per_frame := 1.0 / game_update_hz
 	last_counter := get_clock_value()
-	ms_per_frame: f32
-	second: f32
+
+	when DEBUG_DRAW_TIMINGS {
+		debug_frame_timings: [256]f32
+		debug_render_timings: [256]f32
+		debug_highest_timing := f32(1)
+	}
 
 	for global_is_running {
 		message: win32.Msg
@@ -202,9 +208,49 @@ main :: proc() {
 			width  = backbuffer.width,
 			height = backbuffer.height,
 		}
-		update_and_render_timing_start := get_clock_value()
+		when DEBUG_DRAW_TIMINGS {
+			update_and_render_timing_start := get_clock_value()
+		}
 		app_update_and_render(&screen_buffer)
-		update_and_render_timing_end := get_clock_value()
+		when DEBUG_DRAW_TIMINGS {
+			update_and_render_timing_stop := get_clock_value()
+		}
+
+		when DEBUG_DRAW_TIMINGS {
+			pix_step := 128 / debug_highest_timing
+			target_ms := 1000 * target_seconds_per_frame
+			target_ms_line := int(((target_ms * (target_ms / debug_highest_timing)) * pix_step) + 0.5)
+			for x := 0; x < 256; x += 1 {
+				frame_height: int
+				render_height: int
+				{
+					scaling := debug_frame_timings[x] / debug_highest_timing
+					frame_height = int(((debug_frame_timings[x] * scaling) * pix_step) + 0.5)
+				}
+				{
+					scaling := debug_render_timings[x] / debug_highest_timing
+					render_height = int(((debug_render_timings[x] * scaling) * pix_step) + 0.5)
+				}
+
+				for y := 0; y < 128; y += 1 {
+					i := ((127 - y) * int(screen_buffer.width)) + x
+
+					c: u32 = 0xFF000000
+					if y == target_ms_line {
+						c = 0xFFFF00FF
+					} else if y <= render_height {
+						if render_height > target_ms_line {
+							c = 0xFFFF0000
+						} else {
+							c = 0xFF00AA00
+						}
+					} else if y <= frame_height {
+						c = 0xFF0000AA
+					}
+					screen_buffer.buffer[i] = c
+				}
+			}
+		}
 
 		dc := win32.get_dc(window)
 		client_rect: win32.Rect
@@ -230,16 +276,35 @@ main :: proc() {
 			fmt.printf("missed sleep\n")
 		}
 		end_counter := get_clock_value()
-		ms_per_frame = 1000.0 * get_seconds_elapsed(last_counter, end_counter)
-		second += get_seconds_elapsed(last_counter, end_counter)
-		last_counter = end_counter
-		if second > 1 {
-			second = 0
-			fmt.printf("last. ms/frame: %f\n", ms_per_frame)
-			fmt.printf(
-				"last. ms/render: %f\n",
-				1000.0 * get_seconds_elapsed(update_and_render_timing_start, update_and_render_timing_end),
-			)
+
+		when DEBUG_DRAW_TIMINGS {
+			ms_per_frame := 1000.0 * get_seconds_elapsed(last_counter, end_counter)
+			frame_render_ms := 1000.0 * get_seconds_elapsed(
+	                      update_and_render_timing_start,
+	                      update_and_render_timing_stop,
+                      )
+
+			debug_highest_timing = 0
+			for i := 0; i < 255; i += 1 {
+				debug_frame_timings[i] = debug_frame_timings[i + 1]
+				if debug_frame_timings[i] > debug_highest_timing {
+					debug_highest_timing = debug_frame_timings[i]
+				}
+				debug_render_timings[i] = debug_render_timings[i + 1]
+				if debug_render_timings[i] > debug_highest_timing {
+					debug_highest_timing = debug_render_timings[i]
+				}
+			}
+			debug_frame_timings[255] = ms_per_frame
+			if ms_per_frame > debug_highest_timing {
+				debug_highest_timing = ms_per_frame
+			}
+			debug_render_timings[255] = frame_render_ms
+			if frame_render_ms > debug_highest_timing {
+				debug_highest_timing = frame_render_ms
+			}
 		}
+
+		last_counter = end_counter
 	}
 }
