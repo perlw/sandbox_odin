@@ -265,11 +265,15 @@ main :: proc() {
 
 					c : u32 = 0xFF000000
 					if y == target_ms_line {
-						c = 0xFFFF0000
+						c = 0xFFFF00FF
 					} else if y <= render_height {
-						c = 0xFFCCAA00
+						if render_height > target_ms_line {
+							c = 0xFFFF0000
+						} else {
+							c = 0xFF00AA00
+						}
 					} else if y <= frame_height {
-						c = 0xFF7777AA
+						c = 0xFF0000AA
 					}
 					screen_buffer.buffer[i] = c
 				}
@@ -312,7 +316,7 @@ main :: proc() {
 				elapsed = get_seconds_elapsed(last_counter, get_clock_value())
 			}
 		} else {
-			fmt.printf("missed sleep\n")
+			// fmt.printf("missed sleep\n")
 		}
 
 		end_counter := get_clock_value()
