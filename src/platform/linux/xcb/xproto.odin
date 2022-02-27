@@ -113,10 +113,10 @@ EventMask :: enum u32 {
 	Owner_Grab_Button     = 16777216,
 }
 
-KEY_PRESS      :: u8(2)
-KEY_RELEASE    :: u8(3)
-EXPOSE         :: u8(12)
-CLIENT_MESSAGE :: u8(33)
+KEY_PRESS      : u8 : 2
+KEY_RELEASE    : u8 : 3
+EXPOSE         : u8 : 12
+CLIENT_MESSAGE : u8 : 33
 
 KeyPressEvent :: struct {
 	response_type: u8,

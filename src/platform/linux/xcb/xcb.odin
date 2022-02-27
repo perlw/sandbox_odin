@@ -1,6 +1,6 @@
 package xcb
 
-COPY_FROM_PARENT :: u8(0)
+COPY_FROM_PARENT : u8 : 0
 
 VoidCookie :: struct {
 	sequence: u32,
