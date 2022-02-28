@@ -45,7 +45,42 @@ draw_squircles :: proc(screen_buffer: ^Bitmap) {
 	}
 }
 
+draw_plasma :: proc(screen_buffer: ^Bitmap) {
+	@(static)
+	offset := 0
+	@(static)
+	palette : [256]u32
+	if palette[0] == 0x0 {
+		for i := 0; i < 128; i += 1 {
+			c := color_u32(u8(i), u8(i), u8(i), 0xFF)
+			palette[i] = c
+			palette[255 - i] = c
+		}
+	}
+	@(static)
+	buffer : [1280 * 720]u8
+	if buffer[0] == 0 {
+		for y := u32(0); y < 720; y += 1 {
+			i := y * 1280
+			for x : u32 = 0; x < 1280; x += 1 {
+				c := u8((
+					128 + (math.sin(f32(x) / 16) * 128) +
+					128 + (math.sin(f32(y) / 16) * 128)
+				) / 2)
+				buffer[i + x] = c
+			}
+		}
+	}
+
+	for _, i in buffer {
+		screen_buffer.buffer[i] = palette[(offset + int(buffer[i])) % 256]
+	}
+
+	offset = (offset + 1) % 256
+}
+
 app_update_and_render :: proc(screen_buffer: ^Bitmap) {
 	// draw_xor(screen_buffer)
-	draw_squircles(screen_buffer)
+	// draw_squircles(screen_buffer)
+	draw_plasma(screen_buffer)
 }
