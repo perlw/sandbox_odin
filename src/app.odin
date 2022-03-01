@@ -1,9 +1,38 @@
 package main
 
 import "core:math"
+import "core:math/linalg"
 
 color_u32 :: #force_inline proc(r, g, b, a: u8) -> u32 {
 	return (u32(a) << 24) + (u32(r) << 16) + (u32(g) << 8) + u32(b)
+}
+
+// h: 0-360, s: 0-1, v: 0-1
+rgb_to_hsv :: proc (h: u32, s: f32, v: f32) -> u32 {
+	c := s * v
+	x := c * (1 - linalg.abs(math.mod(f32(h) / 60, 2) - 1))
+	m := v - c
+
+	r1, g1, b1 : f32
+	if h >= 0 && h < 60 {
+		r1, g1, b1 = c, x, 0
+	} else if h >= 60 && h < 120 {
+		r1, g1, b1 = x, c, 0
+	} else if h >= 120 && h < 180 {
+		r1, g1, b1 = 0, c, x
+	} else if h >= 180 && h < 240 {
+		r1, g1, b1 = 0, x, c
+	} else if h >= 240 && h < 300 {
+		r1, g1, b1 = x, 0, c
+	} else {
+		r1, g1, b1 = c, 0, x
+	}
+
+	r := u8((r1 + m) * 255)
+	g := u8((g1 + m) * 255)
+	b := u8((b1 + m) * 255)
+
+	return color_u32(r, g, b, 0xFF)
 }
 
 draw_xor :: proc(screen_buffer: ^Bitmap) {
@@ -51,10 +80,13 @@ draw_plasma :: proc(screen_buffer: ^Bitmap) {
 	@(static)
 	palette : [256]u32
 	if palette[0] == 0x0 {
-		for i := 0; i < 128; i += 1 {
+		/*for i := 0; i < 128; i += 1 {
 			c := color_u32(u8(i), u8(i), u8(i), 0xFF)
 			palette[i] = c
 			palette[255 - i] = c
+		}*/
+		for i := 0; i < 256; i += 1 {
+			palette[i] = rgb_to_hsv(u32((f32(i) * 1.4) + 0.5), 1, 1)
 		}
 	}
 	@(static)
@@ -74,6 +106,20 @@ draw_plasma :: proc(screen_buffer: ^Bitmap) {
 
 	for _, i in buffer {
 		screen_buffer.buffer[i] = palette[(offset + int(buffer[i])) % 256]
+	}
+
+	/** Debug palette drawing */
+	palette_start := int(screen_buffer.width * (screen_buffer.height - 11))
+	for x := 0; x <= 256; x += 1 {
+		screen_buffer.buffer[palette_start + x] = 0xFF000000
+	}
+	palette_start += int(screen_buffer.width)
+	for y := 0; y < 10; y += 1 {
+		y_offset := y * int(screen_buffer.width)
+		for c, i in palette {
+			screen_buffer.buffer[palette_start + y_offset + i] = c
+		}
+		screen_buffer.buffer[palette_start + y_offset + 256] = 0xFF000000
 	}
 
 	offset = (offset + 1) % 256
