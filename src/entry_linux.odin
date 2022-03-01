@@ -161,14 +161,21 @@ main :: proc() {
 	key_syms := xcbkeysyms.symbols_alloc(connection)
 	defer xcbkeysyms.symbols_free(key_syms)
 
-	backbuffer: Backbuffer
-	fmt.printf("backbuffer: %+v\n", backbuffer)
-	resize_backbuffer(&backbuffer, connection, window, 1280, 720)
-	defer shm.ctl(backbuffer.shm_id, shm.IPC_RMID, nil)
-	defer shm.dt(backbuffer.memory)
-	defer xcbshm.detach(connection, backbuffer.shm_seg_id)
-	defer xcb.free_pixmap(connection, backbuffer.pixmap_id)
-	fmt.printf("backbuffer: %+v\n", backbuffer)
+	backbuffers : [2]Backbuffer
+	backbuffer_index := 0
+	resize_backbuffer(&backbuffers[0], connection, window, 1280, 720)
+	resize_backbuffer(&backbuffers[1], connection, window, 1280, 720)
+	defer shm.ctl(backbuffers[0].shm_id, shm.IPC_RMID, nil)
+	defer shm.dt(backbuffers[0].memory)
+	defer xcbshm.detach(connection, backbuffers[0].shm_seg_id)
+	defer xcb.free_pixmap(connection, backbuffers[0].pixmap_id)
+
+	defer shm.ctl(backbuffers[1].shm_id, shm.IPC_RMID, nil)
+	defer shm.dt(backbuffers[1].memory)
+	defer xcbshm.detach(connection, backbuffers[1].shm_seg_id)
+	defer xcb.free_pixmap(connection, backbuffers[1].pixmap_id)
+	fmt.printf("backbuffer[0]: %+v\n", backbuffers[0])
+	fmt.printf("backbuffer[1]: %+v\n", backbuffers[1])
 
 	shm_completion_event := xcb.get_extension_data(connection, &xcbshm.Id).first_event + xcbshm.COMPLETION
 	fmt.printf("completion event: %d\n", shm_completion_event)
@@ -185,6 +192,7 @@ main :: proc() {
 
 	is_running := true
 	ready_to_blit := true
+	backbuffer := backbuffers[backbuffer_index]
 	for is_running {
 		event := xcb.poll_for_event(connection)
 		for ; event != nil; event = xcb.poll_for_event(connection) {
@@ -313,6 +321,9 @@ main :: proc() {
 			)
 
 			xcb.flush(connection)
+
+			backbuffer_index = (backbuffer_index + 1) % 2
+			backbuffer = backbuffers[backbuffer_index]
 		}
 
 		elapsed := get_seconds_elapsed(last_counter, get_clock_value())
