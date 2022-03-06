@@ -161,7 +161,7 @@ main :: proc() {
 	key_syms := xcbkeysyms.symbols_alloc(connection)
 	defer xcbkeysyms.symbols_free(key_syms)
 
-	backbuffers : [2]Backbuffer
+	backbuffers: [2]Backbuffer
 	backbuffer_index := 0
 	resize_backbuffer(&backbuffers[0], connection, window, 1280, 720)
 	resize_backbuffer(&backbuffers[1], connection, window, 1280, 720)

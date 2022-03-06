@@ -8,12 +8,12 @@ color_u32 :: #force_inline proc(r, g, b, a: u8) -> u32 {
 }
 
 // h: 0-360, s: 0-1, v: 0-1
-rgb_to_hsv :: proc (h: u32, s: f32, v: f32) -> u32 {
+rgb_to_hsv :: proc(h: u32, s: f32, v: f32) -> u32 {
 	c := s * v
 	x := c * (1 - linalg.abs(math.mod(f32(h) / 60, 2) - 1))
 	m := v - c
 
-	r1, g1, b1 : f32
+	r1, g1, b1: f32
 	if h >= 0 && h < 60 {
 		r1, g1, b1 = c, x, 0
 	} else if h >= 60 && h < 120 {
@@ -37,11 +37,11 @@ rgb_to_hsv :: proc (h: u32, s: f32, v: f32) -> u32 {
 
 draw_xor :: proc(screen_buffer: ^Bitmap) {
 	@(static)
-	offset : u32 = 0
+	offset: u32 = 0
 
 	for y := u32(0); y < screen_buffer.height; y += 1 {
 		i := y * screen_buffer.width
-		for x : u32 = 0; x < screen_buffer.width; x += 1 {
+		for x: u32 = 0; x < screen_buffer.width; x += 1 {
 			c := u8(((x + offset) ~ (y + offset)) % 256)
 			screen_buffer.buffer[i + x] = color_u32(c, c, c, 0xFF)
 		}
@@ -50,17 +50,17 @@ draw_xor :: proc(screen_buffer: ^Bitmap) {
 	offset += 2
 }
 
-draw_squircles :: proc(screen_buffer: ^Bitmap) {
+draw_slow_squircles :: proc(screen_buffer: ^Bitmap) {
 	@(static)
-	offset : u32 = 0
+	offset: u32 = 0
 	@(static)
-	scale : f32 = 256
+	scale: f32 = 256
 	@(static)
-	scale_speed : f32 = 0.3
+	scale_speed: f32 = 0.3
 
 	for y := u32(0); y < screen_buffer.height; y += 1 {
 		i := y * screen_buffer.width
-		for x : u32 = 0; x < screen_buffer.width; x += 1 {
+		for x: u32 = 0; x < screen_buffer.width; x += 1 {
 			c := u8(128 + (math.sin(f32((x * x) + (y * y) + offset) / scale) * 127))
 			screen_buffer.buffer[i + x] = color_u32(c, c, c, 0xFF)
 		}
@@ -74,38 +74,61 @@ draw_squircles :: proc(screen_buffer: ^Bitmap) {
 	}
 }
 
-draw_plasma :: proc(screen_buffer: ^Bitmap) {
+draw_fast_squircles :: proc(screen_buffer: ^Bitmap) {
 	@(static)
 	offset := 0
 	@(static)
-	palette : [256]u32
+	scale: f32 = 512
+	@(static)
+	palette: [256]u32
 	if palette[0] == 0x0 {
-		/*for i := 0; i < 128; i += 1 {
-			c := color_u32(u8(i), u8(i), u8(i), 0xFF)
-			palette[i] = c
-			palette[255 - i] = c
-		}*/
 		for i := 0; i < 256; i += 1 {
 			palette[i] = rgb_to_hsv(u32((f32(i) * 1.4) + 0.5), 1, 1)
 		}
 	}
 	@(static)
-	buffer : [1280 * 720]u8
+	buffer: [1280 * 720]u8
 	if buffer[0] == 0 {
 		for y := u32(0); y < 720; y += 1 {
 			i := y * 1280
-			for x : u32 = 0; x < 1280; x += 1 {
-				c := u8((
-					128 + (math.sin(f32(x) / 16) * 128) +
-					128 + (math.sin(f32(y) / 16) * 128)
-				) / 2)
+			for x: u32 = 0; x < 1280; x += 1 {
+				c := u8(128 + (math.sin(f32((x * x) + (y * y)) / scale) * 127))
 				buffer[i + x] = c
 			}
 		}
 	}
 
-	for _, i in buffer {
-		screen_buffer.buffer[i] = palette[(offset + int(buffer[i])) % 256]
+	for p, i in buffer {
+		screen_buffer.buffer[i] = palette[(offset + int(p)) % 256]
+	}
+
+	offset = (offset + 1) % 256
+}
+
+draw_plasma :: proc(screen_buffer: ^Bitmap) {
+	@(static)
+	offset := 0
+	@(static)
+	palette: [256]u32
+	if palette[0] == 0x0 {
+		for i := 0; i < 256; i += 1 {
+			palette[i] = rgb_to_hsv(u32((f32(i) * 1.4) + 0.5), 1, 1)
+		}
+	}
+	@(static)
+	buffer: [1280 * 720]u8
+	if buffer[0] == 0 {
+		for y := u32(0); y < 720; y += 1 {
+			i := y * 1280
+			for x: u32 = 0; x < 1280; x += 1 {
+				c := u8((128 + (math.sin(f32(x) / 16) * 128) + 128 + (math.sin(f32(y) / 16) * 128)) / 2)
+				buffer[i + x] = c
+			}
+		}
+	}
+
+	for p, i in buffer {
+		screen_buffer.buffer[i] = palette[(offset + int(p)) % 256]
 	}
 
 	/** Debug palette drawing */
@@ -127,6 +150,7 @@ draw_plasma :: proc(screen_buffer: ^Bitmap) {
 
 app_update_and_render :: proc(screen_buffer: ^Bitmap) {
 	// draw_xor(screen_buffer)
-	// draw_squircles(screen_buffer)
-	draw_plasma(screen_buffer)
+	// draw_slow_squircles(screen_buffer)
+	draw_fast_squircles(screen_buffer)
+	// draw_plasma(screen_buffer)
 }
