@@ -2,9 +2,14 @@ package main
 
 import "core:math"
 import "core:math/linalg"
+import "core:mem"
 
 color_u32 :: #force_inline proc(r, g, b, a: u8) -> u32 {
 	return (u32(a) << 24) + (u32(r) << 16) + (u32(g) << 8) + u32(b)
+}
+
+round_i32 :: #force_inline proc(v: f32) -> i32 {
+	return i32(v + 0.5)
 }
 
 abs :: proc(a: i32) -> i32 {
@@ -190,12 +195,7 @@ draw_plasma :: proc(bitmap: ^Bitmap) {
 	offset = (offset + 1) % 256
 }
 
-app_update_and_render :: proc(screen_buffer: ^Bitmap) {
-	// draw_xor(screen_buffer)
-	// draw_slow_squircles(screen_buffer)
-	draw_fast_squircles(screen_buffer)
-	// draw_plasma(screen_buffer)
-
+draw_line_tests :: proc(screen_buffer: ^Bitmap) {
 	draw_line(screen_buffer, 220, 360, 420, 360, 0xFFFFFFFF)
 	draw_line(screen_buffer, 320, 260, 320, 460, 0xFFFFFFFF)
 	draw_line(screen_buffer, 220, 260, 420, 460, 0xFFFFFFFF)
@@ -222,4 +222,117 @@ app_update_and_render :: proc(screen_buffer: ^Bitmap) {
 		px = x
 		py = y
 	}
+}
+
+TrackPiece :: struct {
+	curvature: f32,
+	length:    f32,
+}
+
+draw_race :: proc(screen_buffer: ^Bitmap) {
+	@(static)
+	pos: f32
+	@(static)
+	track_curve: f32
+	@(static)
+	track: []TrackPiece = {
+		{0, 10},
+		{0, 200},
+		{1, 200},
+		{0, 400},
+		{-1, 100},
+		{0, 200},
+		{-1, 200},
+		{1, 200},
+		{0, 200},
+		{0.2, 500},
+		{0, 200},
+	}
+	@(static)
+	track_distance: f32
+	if track_distance <= 0 {
+		for section in track {
+			track_distance += section.length
+		}
+	}
+
+	if pos >= track_distance {
+		pos -= track_distance
+	}
+
+	offset: f32 = 0
+	track_section := 0
+	for track_section < len(track) && offset <= pos {
+		offset += track[track_section].length
+		track_section += 1
+	}
+	target_curve := track[track_section - 1].curvature
+	track_curve += (target_curve - track_curve) * 0.0333 // ~30fps
+
+	mem.zero_slice(screen_buffer.buffer)
+
+	horizon := i32(screen_buffer.height / 2)
+	// Sky
+	for y: i32 = 0; y < horizon; y += 1 {
+		color: u32 = (y < horizon / 2 ? 0xFF000033 : 0xFF000066)
+		for x: i32 = 0; x < i32(screen_buffer.width); x += 1 {
+			screen_buffer.buffer[(y * i32(screen_buffer.width)) + x] = color
+		}
+	}
+	for x: i32 = 0; x < i32(screen_buffer.width); x += 1 {
+		hill_height := abs(i32(math.sin((f32(x) * 0.0025) + track_curve) * 64))
+		for y: i32 = horizon - hill_height; y < i32(screen_buffer.height); y += 1 {
+			screen_buffer.buffer[(y * i32(screen_buffer.width)) + x] = 0xFF003300
+		}
+	}
+
+	// Track
+	for y: i32 = 0; y < horizon; y += 1 {
+		perspective := f32(y) / f32(horizon)
+		mid_point: f32 = 0.5 + (track_curve * math.pow(1 - perspective, 3))
+
+		road_width := 0.1 + (perspective * 0.8)
+		clip_width := road_width * 0.15
+		road_width *= 0.5
+
+		left_grass := round_i32((mid_point - road_width - clip_width) * f32(screen_buffer.width))
+		left_clip := round_i32((mid_point - road_width) * f32(screen_buffer.width))
+		right_clip := round_i32((mid_point + road_width) * f32(screen_buffer.width))
+		right_grass := round_i32((mid_point + road_width + clip_width) * f32(screen_buffer.width))
+
+		grass_color: u32 = (math.sin(20 * math.pow(1 - perspective, 3) + (pos * 0.1)) >
+		0 ? 0xFF00AA00 : 0xFF006600)
+		clip_color: u32 = (math.sin(80 * math.pow(1 - perspective, 2) + pos) >
+		0 ? 0xFFAA0000 : 0xFFFFFFFF)
+
+		i := (horizon + y) * i32(screen_buffer.width)
+		for x: i32 = 0; x < i32(screen_buffer.width); x += 1 {
+			if x >= 0 && x < left_grass {
+				screen_buffer.buffer[i + x] = grass_color
+			}
+			if x >= left_grass && x < left_clip {
+				screen_buffer.buffer[i + x] = clip_color
+			}
+			if x >= left_clip && x < right_clip {
+				screen_buffer.buffer[i + x] = 0xFFAAAAAA
+			}
+			if x >= right_clip && x < right_grass {
+				screen_buffer.buffer[i + x] = clip_color
+			}
+			if x >= right_grass {
+				screen_buffer.buffer[i + x] = grass_color
+			}
+		}
+	}
+
+	pos += 5
+}
+
+app_update_and_render :: proc(screen_buffer: ^Bitmap) {
+	// draw_xor(screen_buffer)
+	// draw_slow_squircles(screen_buffer)
+	// draw_fast_squircles(screen_buffer)
+	// draw_plasma(screen_buffer)
+	// draw_line_tests(screen_buffer)
+	draw_race(screen_buffer)
 }
