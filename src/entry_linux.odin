@@ -9,6 +9,7 @@ import "platform/linux/xcb"
 import xcbshm "platform/linux/xcb/shm"
 import xcbkeysyms "platform/linux/xcb/keysyms"
 import xcberrors "platform/linux/xcb/errors"
+import "platform/linux/X11"
 
 foreign import unistd "system:c"
 @(default_calling_convention = "std")
@@ -26,7 +27,7 @@ Backbuffer :: struct {
 	shm_id:     i32,
 	width:      u16,
 	height:     u16,
-	bps:        u32,
+	bps:        u8,
 	pitch:      u32,
 }
 
@@ -35,7 +36,7 @@ resize_backbuffer :: proc(
 	connection: ^xcb.Connection,
 	window: xcb.Window,
 	width,
-	height: u32,
+	height: u16,
 ) {
 	if backbuffer.shm_seg_id == 0 {
 		backbuffer.shm_seg_id = xcbshm.Seg(xcb.generate_id(connection))
@@ -48,14 +49,14 @@ resize_backbuffer :: proc(
 	}
 	xcb.flush(connection)
 
-	backbuffer.width = 1280
-	backbuffer.height = 720
+	backbuffer.width = width
+	backbuffer.height = height
 	backbuffer.bps = 4
 	backbuffer.pitch = u32(backbuffer.width) * u32(backbuffer.height)
 
 	backbuffer.shm_id = shm.get(
 		shm.IPC_PRIVATE,
-		u32(backbuffer.bps * backbuffer.pitch),
+		u32(backbuffer.bps) * backbuffer.pitch,
 		shm.IPC_CREAT | 0o600,
 	)
 	backbuffer.memory = shm.at(backbuffer.shm_id, nil, 0)
@@ -225,9 +226,8 @@ main :: proc() {
 					evt := (^xcb.KeyPressEvent)(event)
 					key_sym := xcbkeysyms.press_lookup_keysym(key_syms, evt, 0)
 
-					// NOTE: 0xff1b == XK_escape
-					fmt.printf("KEY DOWN: %v %d ?= %d\n", evt, key_sym, 0xff1b)
-					if key_sym == 0xff1b {
+					fmt.printf("KEY DOWN: %v %d ?= %d\n", evt, key_sym, X11.KeyCode.Escape)
+					if key_sym == u32(X11.KeyCode.Escape) {
 						is_running = false
 					}
 				}

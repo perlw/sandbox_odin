@@ -1,3 +1,4 @@
+// NOTE: Based on <xcb/xcb_errors.h>
 package xcb_errors
 
 import xcb "../"

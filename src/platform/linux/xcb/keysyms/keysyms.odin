@@ -1,3 +1,4 @@
+// NOTE: Based on <xcb/xcb_keysyms.h>
 package xcb_keysyms
 
 import xcb "../"

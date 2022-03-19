@@ -1,3 +1,4 @@
+// NOTE: Based on <xcb/xcb.h>
 package xcb
 
 COPY_FROM_PARENT: u8 : 0

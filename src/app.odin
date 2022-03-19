@@ -97,7 +97,7 @@ draw_xor :: proc(bitmap: ^Bitmap) {
 	offset += 2
 }
 
-draw_slow_squircles :: proc(bitmap: ^Bitmap) {
+draw_slow_circles :: proc(bitmap: ^Bitmap) {
 	@(static)
 	offset: u32 = 0
 	@(static)
@@ -121,7 +121,10 @@ draw_slow_squircles :: proc(bitmap: ^Bitmap) {
 	}
 }
 
-draw_fast_squircles :: proc(bitmap: ^Bitmap) {
+Fixed_Width :: 1280
+Fixed_Height :: 720
+
+draw_fast_circles :: proc(bitmap: ^Bitmap) {
 	@(static)
 	offset := 0
 	@(static)
@@ -134,11 +137,11 @@ draw_fast_squircles :: proc(bitmap: ^Bitmap) {
 		}
 	}
 	@(static)
-	buffer: [1280 * 720]u8
+	buffer: [Fixed_Width * Fixed_Height]u8
 	if buffer[0] == 0 {
-		for y := u32(0); y < 720; y += 1 {
-			i := y * 1280
-			for x: u32 = 0; x < 1280; x += 1 {
+		for y := u32(0); y < Fixed_Height; y += 1 {
+			i := y * Fixed_Width
+			for x: u32 = 0; x < Fixed_Width; x += 1 {
 				c := u8(128 + (math.sin(f32((x * x) + (y * y)) / scale) * 127))
 				buffer[i + x] = c
 			}
@@ -163,11 +166,11 @@ draw_plasma :: proc(bitmap: ^Bitmap) {
 		}
 	}
 	@(static)
-	buffer: [1280 * 720]u8
+	buffer: [Fixed_Width * Fixed_Height]u8
 	if buffer[0] == 0 {
-		for y := u32(0); y < 720; y += 1 {
-			i := y * 1280
-			for x: u32 = 0; x < 1280; x += 1 {
+		for y := u32(0); y < Fixed_Height; y += 1 {
+			i := y * Fixed_Width
+			for x: u32 = 0; x < Fixed_Width; x += 1 {
 				c := u8((128 + (math.sin(f32(x) / 16) * 128) + 128 + (math.sin(f32(y) / 16) * 128)) / 2)
 				buffer[i + x] = c
 			}
@@ -229,7 +232,10 @@ TrackPiece :: struct {
 	length:    f32,
 }
 
-draw_race :: proc(screen_buffer: ^Bitmap) {
+// Credit to:
+//  Code-It-Yourself! Retro Arcade Racing Game - Programming from Scratch (Quick and Simple C++)
+//  https://www.youtube.com/watch?v=KkMZI5Jbf18
+draw_olc_race :: proc(screen_buffer: ^Bitmap) {
 	@(static)
 	pos: f32
 	@(static)
@@ -330,9 +336,9 @@ draw_race :: proc(screen_buffer: ^Bitmap) {
 
 app_update_and_render :: proc(screen_buffer: ^Bitmap) {
 	// draw_xor(screen_buffer)
-	// draw_slow_squircles(screen_buffer)
-	// draw_fast_squircles(screen_buffer)
+	// draw_slow_circles(screen_buffer)
+	// draw_fast_circles(screen_buffer)
 	// draw_plasma(screen_buffer)
 	// draw_line_tests(screen_buffer)
-	draw_race(screen_buffer)
+	draw_olc_race(screen_buffer)
 }

@@ -1,3 +1,4 @@
+// NOTE: Based on <xcb/shm.h>
 package xcb_shm
 
 import xcb "../"

@@ -1,3 +1,4 @@
+// NOTE: Based on <xcb/xproto.h>
 package xcb
 
 Keycode :: distinct u8
