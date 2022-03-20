@@ -83,18 +83,18 @@ get_seconds_elapsed :: #force_inline proc(start, end: time.TimeSpec) -> f32 {
 	return f32(end.tv_sec - start.tv_sec) + (f32(end.tv_nsec - start.tv_nsec) / 1000000000.0)
 }
 
-input_key_translation := map[X11.KeyCode]AppInputKey{
-	X11.KeyCode.Escape = AppInputKey.Escape,
-	X11.KeyCode.Num0   = AppInputKey.Num0,
-	X11.KeyCode.Num1   = AppInputKey.Num1,
-	X11.KeyCode.Num2   = AppInputKey.Num2,
-	X11.KeyCode.Num3   = AppInputKey.Num3,
-	X11.KeyCode.Num4   = AppInputKey.Num4,
-	X11.KeyCode.Num5   = AppInputKey.Num5,
-	X11.KeyCode.Num6   = AppInputKey.Num6,
-	X11.KeyCode.Num7   = AppInputKey.Num7,
-	X11.KeyCode.Num8   = AppInputKey.Num8,
-	X11.KeyCode.Num9   = AppInputKey.Num9,
+input_key_translation := map[X11.Key_Code]AppInputKey{
+	X11.Key_Code.Escape = AppInputKey.Escape,
+	X11.Key_Code.Num0   = AppInputKey.Num0,
+	X11.Key_Code.Num1   = AppInputKey.Num1,
+	X11.Key_Code.Num2   = AppInputKey.Num2,
+	X11.Key_Code.Num3   = AppInputKey.Num3,
+	X11.Key_Code.Num4   = AppInputKey.Num4,
+	X11.Key_Code.Num5   = AppInputKey.Num5,
+	X11.Key_Code.Num6   = AppInputKey.Num6,
+	X11.Key_Code.Num7   = AppInputKey.Num7,
+	X11.Key_Code.Num8   = AppInputKey.Num8,
+	X11.Key_Code.Num9   = AppInputKey.Num9,
 }
 
 main :: proc() {
@@ -241,8 +241,8 @@ main :: proc() {
 					evt := (^xcb.KeyPressEvent)(event)
 					key_sym := X11.KeyCode(xcbkeysyms.press_lookup_keysym(key_syms, evt, 0))
 
-					// fmt.printf("KEY DOWN: %v %d ?= %d\n", evt, key_sym, X11.KeyCode.Escape)
-					if key_sym == X11.KeyCode.Escape {
+					// fmt.printf("KEY DOWN: %v %d ?= %d\n", evt, key_sym, X11.Key_Code.Escape)
+					if key_sym == X11.Key_Code.Escape {
 						is_running = false
 					}
 
@@ -255,7 +255,7 @@ main :: proc() {
 					evt := (^xcb.KeyReleaseEvent)(event)
 					key_sym := X11.KeyCode(xcbkeysyms.release_lookup_keysym(key_syms, evt, 0))
 
-					// fmt.printf("KEY UP: %v %d ?= %d\n", evt, key_sym, X11.KeyCode.Escape)
+					// fmt.printf("KEY UP: %v %d ?= %d\n", evt, key_sym, X11.Key_Code.Escape)
 					if translated_key, ok := input_key_translation[key_sym]; ok {
 						input.keyboard[translated_key].transitions += 1
 						input.keyboard[translated_key].down = (input.keyboard[translated_key].transitions % 2 != 0)

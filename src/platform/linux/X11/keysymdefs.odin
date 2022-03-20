@@ -7,7 +7,7 @@ package X11
 // #define macro to Odin constant macro: qavelxve[run substitution]elcw :: <esc>fxlvegU/#define<cr>q
 // Later, after deciding to go the enum route: qadf_elct0 = <esc>A,<esc>/XK_<cr>q
 
-KeyCode :: enum u16 {
+Key_Code :: enum u16 {
 	// #ifdef XK_MISCELLANY
 	Back_Space         = 0xFF08,
 	Tab                = 0xFF09,
