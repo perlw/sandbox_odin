@@ -83,6 +83,20 @@ get_seconds_elapsed :: #force_inline proc(start, end: time.TimeSpec) -> f32 {
 	return f32(end.tv_sec - start.tv_sec) + (f32(end.tv_nsec - start.tv_nsec) / 1000000000.0)
 }
 
+input_key_translation := map[X11.KeyCode]AppInputKey{
+	X11.KeyCode.Escape = AppInputKey.Escape,
+	X11.KeyCode.Num0   = AppInputKey.Num0,
+	X11.KeyCode.Num1   = AppInputKey.Num1,
+	X11.KeyCode.Num2   = AppInputKey.Num2,
+	X11.KeyCode.Num3   = AppInputKey.Num3,
+	X11.KeyCode.Num4   = AppInputKey.Num4,
+	X11.KeyCode.Num5   = AppInputKey.Num5,
+	X11.KeyCode.Num6   = AppInputKey.Num6,
+	X11.KeyCode.Num7   = AppInputKey.Num7,
+	X11.KeyCode.Num8   = AppInputKey.Num8,
+	X11.KeyCode.Num9   = AppInputKey.Num9,
+}
+
 main :: proc() {
 	fmt.println("Hellope!")
 
@@ -194,6 +208,7 @@ main :: proc() {
 	is_running := true
 	ready_to_blit := true
 	backbuffer := backbuffers[backbuffer_index]
+	input: AppInput
 	for is_running {
 		event := xcb.poll_for_event(connection)
 		for ; event != nil; event = xcb.poll_for_event(connection) {
@@ -221,14 +236,30 @@ main :: proc() {
 				fmt.printf("XCB_EXPOSE\n")
 
 			case xcb.KEY_PRESS, xcb.KEY_RELEASE:
-				fmt.printf("XCB_KEY_PRESS/RELEASE\n")
+				// fmt.printf("XCB_KEY_PRESS/RELEASE\n")
 				if (event.response_type == xcb.KEY_PRESS) {
 					evt := (^xcb.KeyPressEvent)(event)
-					key_sym := xcbkeysyms.press_lookup_keysym(key_syms, evt, 0)
+					key_sym := X11.KeyCode(xcbkeysyms.press_lookup_keysym(key_syms, evt, 0))
 
-					fmt.printf("KEY DOWN: %v %d ?= %d\n", evt, key_sym, X11.KeyCode.Escape)
-					if key_sym == u32(X11.KeyCode.Escape) {
+					// fmt.printf("KEY DOWN: %v %d ?= %d\n", evt, key_sym, X11.KeyCode.Escape)
+					if key_sym == X11.KeyCode.Escape {
 						is_running = false
+					}
+
+					if translated_key, ok := input_key_translation[key_sym]; ok {
+						//fmt.printf("pressed a valid key, %v\n", translated_key)
+						input.keyboard[translated_key].transitions += 1
+						input.keyboard[translated_key].down = true
+					}
+				} else {
+					evt := (^xcb.KeyReleaseEvent)(event)
+					key_sym := X11.KeyCode(xcbkeysyms.release_lookup_keysym(key_syms, evt, 0))
+
+					// fmt.printf("KEY UP: %v %d ?= %d\n", evt, key_sym, X11.KeyCode.Escape)
+					if translated_key, ok := input_key_translation[key_sym]; ok {
+						input.keyboard[translated_key].transitions += 1
+						input.keyboard[translated_key].down = (input.keyboard[translated_key].transitions % 2 != 0)
+						// fmt.printf("released a valid key, %v, new state: %d\n", translated_key, input.keyboard[translated_key].down)
 					}
 				}
 
@@ -257,7 +288,7 @@ main :: proc() {
 		when DEBUG_DRAW_TIMINGS {
 			update_and_render_timing_start := get_clock_value()
 		}
-		app_update_and_render(&screen_buffer)
+		app_update_and_render(&screen_buffer, &input)
 		when DEBUG_DRAW_TIMINGS {
 			update_and_render_timing_stop := get_clock_value()
 		}

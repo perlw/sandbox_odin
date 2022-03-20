@@ -334,11 +334,51 @@ draw_olc_race :: proc(screen_buffer: ^Bitmap) {
 	pos += 5
 }
 
-app_update_and_render :: proc(screen_buffer: ^Bitmap) {
-	// draw_xor(screen_buffer)
-	// draw_slow_circles(screen_buffer)
-	// draw_fast_circles(screen_buffer)
-	// draw_plasma(screen_buffer)
-	// draw_line_tests(screen_buffer)
-	draw_olc_race(screen_buffer)
+project_segment :: proc() {
+}
+
+// Credit to:
+//  http://www.extentofthejam.com/pseudo/
+//  https://codeincomplete.com/articles/javascript-racer-v1-straight/
+draw_joe_race :: proc(screen_buffer: ^Bitmap) {
+}
+
+scene_funcs := []proc(_: ^Bitmap){
+	draw_xor,
+	draw_slow_circles,
+	draw_fast_circles,
+	draw_plasma,
+	draw_line_tests,
+	draw_olc_race,
+	draw_joe_race,
+}
+
+app_update_and_render :: proc(screen_buffer: ^Bitmap, input: ^AppInput) {
+	@(static)
+	scene_num := 0
+
+	if input.keyboard[AppInputKey.Num1].down {
+		scene_num = 0
+		mem.zero_slice(screen_buffer.buffer)
+	} else if input.keyboard[AppInputKey.Num2].down {
+		scene_num = 1
+		mem.zero_slice(screen_buffer.buffer)
+	} else if input.keyboard[AppInputKey.Num3].down {
+		scene_num = 2
+		mem.zero_slice(screen_buffer.buffer)
+	} else if input.keyboard[AppInputKey.Num4].down {
+		scene_num = 3
+		mem.zero_slice(screen_buffer.buffer)
+	} else if input.keyboard[AppInputKey.Num5].down {
+		scene_num = 4
+		mem.zero_slice(screen_buffer.buffer)
+	} else if input.keyboard[AppInputKey.Num6].down {
+		scene_num = 5
+		mem.zero_slice(screen_buffer.buffer)
+	} else if input.keyboard[AppInputKey.Num7].down {
+		scene_num = 6
+		mem.zero_slice(screen_buffer.buffer)
+	}
+
+	scene_funcs[scene_num](screen_buffer)
 }
