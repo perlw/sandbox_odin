@@ -112,6 +112,20 @@ TIMERR_BASE :: 96
 TIMERR_NOCANDO :: TIMERR_BASE + 1
 TIMERR_NOERROR :: 0
 
+input_key_translation := map[win32.Key_Code]AppInputKey{
+	win32.Key_Code.Escape = AppInputKey.Escape,
+	win32.Key_Code.Num0   = AppInputKey.Num0,
+	win32.Key_Code.Num1   = AppInputKey.Num1,
+	win32.Key_Code.Num2   = AppInputKey.Num2,
+	win32.Key_Code.Num3   = AppInputKey.Num3,
+	win32.Key_Code.Num4   = AppInputKey.Num4,
+	win32.Key_Code.Num5   = AppInputKey.Num5,
+	win32.Key_Code.Num6   = AppInputKey.Num6,
+	win32.Key_Code.Num7   = AppInputKey.Num7,
+	win32.Key_Code.Num8   = AppInputKey.Num8,
+	win32.Key_Code.Num9   = AppInputKey.Num9,
+}
+
 main :: proc() {
 	fmt.println("Hellope!")
 
@@ -183,6 +197,7 @@ main :: proc() {
 		debug_highest_timing := f32(1)
 	}
 
+	input: AppInput
 	for global_is_running {
 		message: win32.Msg
 		for win32.peek_message_a(&message, window, 0, 0, win32.PM_REMOVE) {
@@ -193,8 +208,13 @@ main :: proc() {
 
 			case win32.WM_SYSKEYDOWN, win32.WM_SYSKEYUP, win32.WM_KEYDOWN, win32.WM_KEYUP:
 				win32.output_debug_string_a("WM_SYS/KEY\n")
-				if message.wparam == win32.VK_ESCAPE {
+				key_code := win32.Key_Code(message.wparam)
+				if key_code == win32.Key_Code.Escape {
 					global_is_running = false
+				}
+
+				if translated_key, ok := input_key_translation[key_code]; ok {
+					input.keyboard[translated_key].down = ((message.lparam & (1 << 31)) == 0)
 				}
 
 			case:
@@ -211,7 +231,7 @@ main :: proc() {
 		when DEBUG_DRAW_TIMINGS {
 			update_and_render_timing_start := get_clock_value()
 		}
-		app_update_and_render(&screen_buffer)
+		app_update_and_render(&screen_buffer, &input)
 		when DEBUG_DRAW_TIMINGS {
 			update_and_render_timing_stop := get_clock_value()
 		}
