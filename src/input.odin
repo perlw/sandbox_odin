@@ -1,5 +1,6 @@
 package main
 
+// TODO: Add missing common keys + some basic umlauts.
 AppInputKey :: enum u8 {
 	Escape = 0,
 	Num0,

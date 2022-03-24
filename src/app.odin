@@ -334,14 +334,21 @@ draw_olc_race :: proc(screen_buffer: ^Bitmap) {
 	pos += 5
 }
 
-project_segment :: proc() {
-}
-
 // Credit to:
 //  http://www.extentofthejam.com/pseudo/
 //  https://codeincomplete.com/articles/javascript-racer-v1-straight/
 draw_joe_race :: proc(screen_buffer: ^Bitmap) {
 }
+
+// Credit to:
+//  https://github.com/s-macke/VoxelSpace
+draw_voxel_space :: proc(screen_buffer: ^Bitmap) {
+}
+
+// TODO: "Piano" scene.
+// TODO: Basic 24-bit .bmp-support. (can/should use stb libs in the future)
+// TODO: Advanced bitmap functions.
+// TODO: Controller support, win/lin.
 
 scene_funcs := []proc(_: ^Bitmap){
 	draw_xor,
@@ -351,8 +358,11 @@ scene_funcs := []proc(_: ^Bitmap){
 	draw_line_tests,
 	draw_olc_race,
 	draw_joe_race,
+	draw_voxel_space,
 }
 
+// TODO: Text drawing.
+// TODO: VirtualAlloc'ed/shm memory, hooked into Odin's context.
 app_update_and_render :: proc(screen_buffer: ^Bitmap, input: ^AppInput) {
 	@(static)
 	scene_num := 0
@@ -377,6 +387,9 @@ app_update_and_render :: proc(screen_buffer: ^Bitmap, input: ^AppInput) {
 		mem.zero_slice(screen_buffer.buffer)
 	} else if input.keyboard[AppInputKey.Num7].down {
 		scene_num = 6
+		mem.zero_slice(screen_buffer.buffer)
+	} else if input.keyboard[AppInputKey.Num8].down {
+		scene_num = 7
 		mem.zero_slice(screen_buffer.buffer)
 	}
 
