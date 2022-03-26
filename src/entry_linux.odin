@@ -239,7 +239,7 @@ main :: proc() {
 				// fmt.printf("XCB_KEY_PRESS/RELEASE\n")
 				if (event.response_type == xcb.KEY_PRESS) {
 					evt := (^xcb.KeyPressEvent)(event)
-					key_sym := X11.KeyCode(xcbkeysyms.press_lookup_keysym(key_syms, evt, 0))
+					key_sym := X11.Key_Code(xcbkeysyms.press_lookup_keysym(key_syms, evt, 0))
 
 					// fmt.printf("KEY DOWN: %v %d ?= %d\n", evt, key_sym, X11.Key_Code.Escape)
 					if key_sym == X11.Key_Code.Escape {
@@ -253,7 +253,7 @@ main :: proc() {
 					}
 				} else {
 					evt := (^xcb.KeyReleaseEvent)(event)
-					key_sym := X11.KeyCode(xcbkeysyms.release_lookup_keysym(key_syms, evt, 0))
+					key_sym := X11.Key_Code(xcbkeysyms.release_lookup_keysym(key_syms, evt, 0))
 
 					// fmt.printf("KEY UP: %v %d ?= %d\n", evt, key_sym, X11.Key_Code.Escape)
 					if translated_key, ok := input_key_translation[key_sym]; ok {
