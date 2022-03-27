@@ -86,11 +86,12 @@ draw_xor :: proc(bitmap: ^Bitmap) {
 	@(static)
 	offset: u32 = 0
 
+	i: u32
 	for y := u32(0); y < bitmap.height; y += 1 {
-		i := y * bitmap.width
 		for x: u32 = 0; x < bitmap.width; x += 1 {
 			c := u8(((x + offset) ~ (y + offset)) % 256)
-			bitmap.buffer[i + x] = color_u32(c, c, c, 0xFF)
+			bitmap.buffer[i] = color_u32(c, c, c, 0xFF)
+			i += 1
 		}
 	}
 
@@ -105,11 +106,12 @@ draw_slow_circles :: proc(bitmap: ^Bitmap) {
 	@(static)
 	scale_speed: f32 = 0.3
 
+	i: u32
 	for y := u32(0); y < bitmap.height; y += 1 {
-		i := y * bitmap.width
 		for x: u32 = 0; x < bitmap.width; x += 1 {
 			c := u8(128 + (math.sin(f32((x * x) + (y * y) + offset) / scale) * 127))
-			bitmap.buffer[i + x] = color_u32(c, c, c, 0xFF)
+			bitmap.buffer[i] = color_u32(c, c, c, 0xFF)
+			i += 1
 		}
 	}
 
@@ -139,11 +141,12 @@ draw_fast_circles :: proc(bitmap: ^Bitmap) {
 	@(static)
 	buffer: [Fixed_Width * Fixed_Height]u8
 	if buffer[0] == 0 {
+		i: u32
 		for y := u32(0); y < Fixed_Height; y += 1 {
-			i := y * Fixed_Width
 			for x: u32 = 0; x < Fixed_Width; x += 1 {
 				c := u8(128 + (math.sin(f32((x * x) + (y * y)) / scale) * 127))
-				buffer[i + x] = c
+				buffer[i] = c
+				i += 1
 			}
 		}
 	}
@@ -168,11 +171,12 @@ draw_plasma :: proc(bitmap: ^Bitmap) {
 	@(static)
 	buffer: [Fixed_Width * Fixed_Height]u8
 	if buffer[0] == 0 {
+		i: u32
 		for y := u32(0); y < Fixed_Height; y += 1 {
-			i := y * Fixed_Width
 			for x: u32 = 0; x < Fixed_Width; x += 1 {
 				c := u8((128 + (math.sin(f32(x) / 16) * 128) + 128 + (math.sin(f32(y) / 16) * 128)) / 2)
-				buffer[i + x] = c
+				buffer[i] = c
+				i += 1
 			}
 		}
 	}
@@ -293,6 +297,7 @@ draw_olc_race :: proc(screen_buffer: ^Bitmap) {
 	}
 
 	// Track
+	i := horizon * i32(screen_buffer.width)
 	for y: i32 = 0; y < horizon; y += 1 {
 		perspective := f32(y) / f32(horizon)
 		mid_point: f32 = 0.5 + (track_curve * math.pow(1 - perspective, 3))
@@ -311,23 +316,23 @@ draw_olc_race :: proc(screen_buffer: ^Bitmap) {
 		clip_color: u32 = (math.sin(80 * math.pow(1 - perspective, 2) + pos) >
 		0 ? 0xFFAA0000 : 0xFFFFFFFF)
 
-		i := (horizon + y) * i32(screen_buffer.width)
 		for x: i32 = 0; x < i32(screen_buffer.width); x += 1 {
 			if x >= 0 && x < left_grass {
-				screen_buffer.buffer[i + x] = grass_color
+				screen_buffer.buffer[i] = grass_color
 			}
 			if x >= left_grass && x < left_clip {
-				screen_buffer.buffer[i + x] = clip_color
+				screen_buffer.buffer[i] = clip_color
 			}
 			if x >= left_clip && x < right_clip {
-				screen_buffer.buffer[i + x] = 0xFFAAAAAA
+				screen_buffer.buffer[i] = 0xFFAAAAAA
 			}
 			if x >= right_clip && x < right_grass {
-				screen_buffer.buffer[i + x] = clip_color
+				screen_buffer.buffer[i] = clip_color
 			}
 			if x >= right_grass {
-				screen_buffer.buffer[i + x] = grass_color
+				screen_buffer.buffer[i] = grass_color
 			}
+			i += 1
 		}
 	}
 
@@ -345,10 +350,11 @@ draw_joe_race :: proc(screen_buffer: ^Bitmap) {
 draw_voxel_space :: proc(screen_buffer: ^Bitmap) {
 }
 
-// TODO: "Piano" scene.
 // TODO: Basic 24-bit .bmp-support. (can/should use stb libs in the future)
-// TODO: Advanced bitmap functions.
+// TODO: Basic bitmap functions. (sub-copy, alpha, etc)
+// TODO: Advanced bitmap functions. (line, rectangle, triangle, filled, etc)
 // TODO: Controller support, win/lin.
+// TODO: "Piano" scene. (after audio)
 
 scene_funcs := []proc(_: ^Bitmap){
 	draw_xor,
