@@ -2,7 +2,7 @@
 package main
 
 import "core:fmt"
-import "core:time"
+import "core:sys/unix"
 
 import "platform/linux/shm"
 import "platform/linux/xcb"
@@ -75,11 +75,13 @@ resize_backbuffer :: proc(
 	)
 }
 
-get_clock_value :: #force_inline proc() -> time.TimeSpec {
-	return time.clock_gettime(time.CLOCK_MONOTONIC_RAW)
+get_clock_value :: #force_inline proc() -> unix.timespec {
+	t: unix.timespec
+	unix.clock_gettime(unix.CLOCK_MONOTONIC_RAW, &t)
+	return t
 }
 
-get_seconds_elapsed :: #force_inline proc(start, end: time.TimeSpec) -> f32 {
+get_seconds_elapsed :: #force_inline proc(start, end: unix.timespec) -> f32 {
 	return f32(end.tv_sec - start.tv_sec) + (f32(end.tv_nsec - start.tv_nsec) / 1000000000.0)
 }
 
