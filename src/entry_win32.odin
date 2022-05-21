@@ -2,33 +2,31 @@
 package main
 
 import "core:fmt"
-import "core:sys/win32"
+import "core:sys/windows"
 
 DEBUG_DRAW_TIMINGS :: #config(DEBUG_DRAW_TIMINGS, false)
-
-WIN32_CLASS_NAME :: cstring("sandboxwin32platform_odin")
 
 global_is_running := true
 
 window_proc :: proc "std" (
-	hwnd: win32.Hwnd,
+	hwnd: windows.HWND,
 	msg: u32,
-	wparam: win32.Wparam,
-	lparam: win32.Lparam,
-) -> win32.Lresult {
-	result: win32.Lresult
+	wparam: windows.WPARAM,
+	lparam: windows.LPARAM,
+) -> windows.LRESULT {
+	result: windows.LRESULT
 
 	switch msg {
-	case win32.WM_DESTROY:
+	case windows.WM_DESTROY:
 		global_is_running = false
-		win32.output_debug_string_a("WM_DESTROY\n")
+		windows.OutputDebugStringW("WM_DESTROY\n")
 
-	case win32.WM_CLOSE:
+	case windows.WM_CLOSE:
 		global_is_running = false
-		win32.output_debug_string_a("WM_CLOSE\n")
+		windows.OutputDebugStringW("WM_CLOSE\n")
 
 	case:
-		result = win32.def_window_proc_a(hwnd, msg, wparam, lparam)
+		result = windows.DefWindowProcW(hwnd, msg, wparam, lparam)
 	}
 
 	return result
@@ -36,7 +34,7 @@ window_proc :: proc "std" (
 
 Backbuffer :: struct {
 	memory:      rawptr,
-	bitmap_info: win32.Bitmap_Info,
+	bitmap_info: windows.BITMAPINFO,
 	width:       u32,
 	height:      u32,
 	bps:         u32,
@@ -45,7 +43,7 @@ Backbuffer :: struct {
 
 resize_backbuffer :: proc(backbuffer: ^Backbuffer, width: u32, height: u32) {
 	if backbuffer.memory != nil {
-		win32.virtual_free(backbuffer.memory, 0, win32.MEM_RELEASE)
+		windows.VirtualFree(backbuffer.memory, 0, windows.MEM_RELEASE)
 	}
 
 	backbuffer.width = width
@@ -53,27 +51,27 @@ resize_backbuffer :: proc(backbuffer: ^Backbuffer, width: u32, height: u32) {
 	backbuffer.bps = 4
 	backbuffer.pitch = width * height
 
-	backbuffer.bitmap_info.header = {
-		size        = size_of(backbuffer.bitmap_info.header),
-		width       = i32(width),
-		height      = -i32(height),
-		planes      = 1,
-		bit_count   = 32,
-		compression = win32.BI_RGB,
+	backbuffer.bitmap_info.bmiHeader = {
+		biSize        = size_of(backbuffer.bitmap_info.bmiHeader),
+		biWidth       = i32(width),
+		biHeight      = -i32(height),
+		biPlanes      = 1,
+		biBitCount   = 32,
+		biCompression = windows.BI_RGB,
 	}
 
-	backbuffer.memory = win32.virtual_alloc(
+	backbuffer.memory = windows.VirtualAlloc(
 		nil,
 		uint(backbuffer.bps * backbuffer.pitch),
-		win32.MEM_RESERVE | win32.MEM_COMMIT,
-		win32.PAGE_READWRITE,
+		windows.MEM_RESERVE | windows.MEM_COMMIT,
+		windows.PAGE_READWRITE,
 	)
 }
 
 get_clock_value :: #force_inline proc() -> i64 {
-	result: i64
-	win32.query_performance_counter(&result)
-	return result
+	result: windows.LARGE_INTEGER
+	windows.QueryPerformanceCounter(&result)
+	return i64(result)
 }
 
 global_perf_count_frequency: i64
@@ -82,16 +80,16 @@ get_seconds_elapsed :: #force_inline proc(start, end: i64) -> f32 {
 	return f32(end - start) / f32(global_perf_count_frequency)
 }
 
-blit_buffer_in_window :: proc(backbuffer: ^Backbuffer, dc: win32.Hdc, width, height: i32) {
+blit_buffer_in_window :: proc(backbuffer: ^Backbuffer, dc: windows.HDC, width, height: i32) {
 	ratio: f32 : 16.0 / 9.0
 	fixed_width := i32(f32(height) * ratio)
 	offset_x := (width - fixed_width) / 2
 
 	if fixed_width != width {
-		win32.pat_blt(dc, 0, 0, offset_x, height, win32.BLACKNESS)
-		win32.pat_blt(dc, width - offset_x, 0, offset_x, height, win32.BLACKNESS)
+		windows.PatBlt(dc, 0, 0, offset_x, height, windows.BLACKNESS)
+		windows.PatBlt(dc, width - offset_x, 0, offset_x, height, windows.BLACKNESS)
 	}
-	win32.stretch_dibits(
+	windows.StretchDIBits(
 		dc,
 		offset_x,
 		0,
@@ -103,8 +101,8 @@ blit_buffer_in_window :: proc(backbuffer: ^Backbuffer, dc: win32.Hdc, width, hei
 		i32(backbuffer.height),
 		backbuffer.memory,
 		&backbuffer.bitmap_info,
-		win32.DIB_RGB_COLORS,
-		win32.SRCCOPY,
+		windows.DIB_RGB_COLORS,
+		windows.SRCCOPY,
 	)
 }
 
@@ -112,79 +110,80 @@ TIMERR_BASE :: 96
 TIMERR_NOCANDO :: TIMERR_BASE + 1
 TIMERR_NOERROR :: 0
 
-input_key_translation := map[win32.Key_Code]AppInputKey{
-	win32.Key_Code.Escape = AppInputKey.Escape,
-	win32.Key_Code.Num0   = AppInputKey.Num0,
-	win32.Key_Code.Num1   = AppInputKey.Num1,
-	win32.Key_Code.Num2   = AppInputKey.Num2,
-	win32.Key_Code.Num3   = AppInputKey.Num3,
-	win32.Key_Code.Num4   = AppInputKey.Num4,
-	win32.Key_Code.Num5   = AppInputKey.Num5,
-	win32.Key_Code.Num6   = AppInputKey.Num6,
-	win32.Key_Code.Num7   = AppInputKey.Num7,
-	win32.Key_Code.Num8   = AppInputKey.Num8,
-	win32.Key_Code.Num9   = AppInputKey.Num9,
+input_key_translation := map[uint]AppInputKey{
+	windows.VK_ESCAPE = AppInputKey.Escape,
+	windows.VK_0			= AppInputKey.Num0,
+	windows.VK_1			= AppInputKey.Num1,
+	windows.VK_2			= AppInputKey.Num2,
+	windows.VK_3			= AppInputKey.Num3,
+	windows.VK_4			= AppInputKey.Num4,
+	windows.VK_5			= AppInputKey.Num5,
+	windows.VK_6			= AppInputKey.Num6,
+	windows.VK_7			= AppInputKey.Num7,
+	windows.VK_8			= AppInputKey.Num8,
+	windows.VK_9			= AppInputKey.Num9,
 }
 
 main :: proc() {
 	fmt.println("Hellope!")
 
-	hinstance := win32.get_module_handle_a(nil)
+	hinstance := windows.GetModuleHandleW(nil)
 	fmt.printf("hinstance %x\n", hinstance)
 
-	global_perf_count_frequency = win32.get_query_performance_frequency()
+	windows.QueryPerformanceFrequency(((^windows.LARGE_INTEGER)(&global_perf_count_frequency)))
 	fmt.printf("perf_count_frequency: %d\n", global_perf_count_frequency)
 
-	sleep_is_granular := (win32.time_begin_period(1) == TIMERR_NOERROR)
+	sleep_is_granular := (windows.timeBeginPeriod(1) == TIMERR_NOERROR)
 	if sleep_is_granular {
 		fmt.printf("-=sleep is granular=-\n")
 	}
 
-	window_class := win32.Wnd_Class_A {
-		style      = win32.CS_OWNDC | win32.CS_HREDRAW | win32.CS_VREDRAW,
-		wnd_proc   = window_proc,
-		instance   = win32.Hinstance(hinstance),
-		cursor     = win32.load_cursor_a(nil, win32.IDC_ARROW),
-		class_name = WIN32_CLASS_NAME,
+	class_name := windows.utf8_to_wstring("sandboxwindowsplatform_odin")
+	window_class := windows.WNDCLASSW {
+		style					= windows.CS_OWNDC | windows.CS_HREDRAW | windows.CS_VREDRAW,
+		lpfnWndProc   = window_proc,
+		hInstance			= windows.HINSTANCE(hinstance),
+		hCursor				= windows.LoadCursorW(nil, ([^]u16)(windows._IDC_ARROW)),
+		lpszClassName = class_name,
 	}
 	fmt.printf("window_class %v\n", window_class)
 
-	if win32.register_class_a(&window_class) == 0 {
-		win32.output_debug_string_a("could not register class\n")
+	if windows.RegisterClassW(&window_class) == 0 {
+		windows.OutputDebugStringW("could not register class\n")
 	}
 
-	wsize := win32.Rect {
+	wsize := windows.RECT {
 		right  = 1280,
 		bottom = 720,
 	}
-	win32.adjust_window_rect(&wsize, win32.WS_OVERLAPPEDWINDOW, false)
+	windows.AdjustWindowRect(&wsize, windows.WS_OVERLAPPEDWINDOW, false)
 	fmt.printf("adjusted wndrect %v\n", wsize)
 
-	window := win32.create_window_ex_a(
-		0,
-		WIN32_CLASS_NAME,
-		"odin-lang hello winapi",
-		win32.WS_OVERLAPPEDWINDOW | win32.WS_VISIBLE,
-		win32.CW_USEDEFAULT,
-		win32.CW_USEDEFAULT,
+	window_title := windows.utf8_to_wstring("odin-lang hello winapi")
+	window := windows.CreateWindowW(
+		class_name,
+		window_title,
+		windows.WS_OVERLAPPEDWINDOW | windows.WS_VISIBLE,
+		windows.CW_USEDEFAULT,
+		windows.CW_USEDEFAULT,
 		wsize.right - wsize.left,
 		wsize.bottom - wsize.top,
 		nil,
 		nil,
-		win32.Hinstance(hinstance),
+		windows.HINSTANCE(hinstance),
 		nil,
 	)
 
 	if window == nil {
-		win32.output_debug_string_a("could not create window\n")
+		windows.OutputDebugStringW("could not create window\n")
 		return
 	}
-	defer win32.destroy_window(window)
+	defer windows.DestroyWindow(window)
 
 	backbuffer: Backbuffer
 	fmt.printf("backbuffer: %+v\n", backbuffer)
 	resize_backbuffer(&backbuffer, 1280, 720)
-	defer win32.virtual_free(backbuffer.memory, 0, win32.MEM_RELEASE)
+	defer windows.VirtualFree(backbuffer.memory, 0, windows.MEM_RELEASE)
 	fmt.printf("backbuffer: %+v\n", backbuffer)
 
 	game_update_hz := f32(30)
@@ -199,27 +198,27 @@ main :: proc() {
 
 	input: AppInput
 	for global_is_running {
-		message: win32.Msg
-		for win32.peek_message_a(&message, window, 0, 0, win32.PM_REMOVE) {
+		message: windows.MSG
+		for windows.PeekMessageW(&message, window, 0, 0, windows.PM_REMOVE) {
 			switch message.message {
-			case win32.WM_QUIT:
+			case windows.WM_QUIT:
 				global_is_running = false
-				win32.output_debug_string_a("WM_QUIT\n")
+				windows.OutputDebugStringW("WM_QUIT\n")
 
-			case win32.WM_SYSKEYDOWN, win32.WM_SYSKEYUP, win32.WM_KEYDOWN, win32.WM_KEYUP:
-				win32.output_debug_string_a("WM_SYS/KEY\n")
-				key_code := win32.Key_Code(message.wparam)
-				if key_code == win32.Key_Code.Escape {
+			case windows.WM_SYSKEYDOWN, windows.WM_SYSKEYUP, windows.WM_KEYDOWN, windows.WM_KEYUP:
+				windows.OutputDebugStringW("WM_SYS/KEY\n")
+				key_code := uint(message.wParam)
+				if key_code == windows.VK_ESCAPE {
 					global_is_running = false
 				}
 
 				if translated_key, ok := input_key_translation[key_code]; ok {
-					input.keyboard[translated_key].down = ((message.lparam & (1 << 31)) == 0)
+					input.keyboard[translated_key].down = ((message.lParam & (1 << 31)) == 0)
 				}
 
 			case:
-				win32.translate_message(&message)
-				win32.dispatch_message_a(&message)
+				windows.TranslateMessage(&message)
+				windows.DispatchMessageW(&message)
 			}
 		}
 
@@ -272,20 +271,20 @@ main :: proc() {
 			}
 		}
 
-		dc := win32.get_dc(window)
-		client_rect: win32.Rect
-		win32.get_client_rect(window, &client_rect)
+		dc := windows.GetDC(window)
+		client_rect: windows.RECT
+		windows.GetClientRect(window, &client_rect)
 		dim_width := client_rect.right - client_rect.left
 		dim_height := client_rect.bottom - client_rect.top
 		blit_buffer_in_window(&backbuffer, dc, dim_width, dim_height)
-		win32.release_dc(window, dc)
+		windows.ReleaseDC(window, dc)
 
 		elapsed := get_seconds_elapsed(last_counter, get_clock_value())
 		if elapsed < target_seconds_per_frame {
 			if sleep_is_granular {
 				sleep_ms := u32(1000 * (target_seconds_per_frame - elapsed))
 				if sleep_ms > 0 {
-					win32.sleep(sleep_ms)
+					windows.Sleep(sleep_ms)
 				}
 			}
 

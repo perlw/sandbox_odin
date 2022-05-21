@@ -6,6 +6,6 @@ REM CALL "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxi
 IF NOT EXIST build mkdir build
 pushd build
 
-"../../Odin/odin" build ../src -out:sandbox -define:DEBUG_DRAW_TIMINGS=true -show-timings -debug -pdb-name:sandbox.pdb -vet -strict-style -warnings-as-errors -verbose-errors
+"../../Odin/odin" build ../src -out:sandbox.exe -define:DEBUG_DRAW_TIMINGS=true -show-timings -debug -pdb-name:sandbox.pdb -vet -strict-style -warnings-as-errors -verbose-errors
 
 popd
