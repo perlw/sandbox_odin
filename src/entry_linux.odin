@@ -109,7 +109,7 @@ main :: proc() {
 	setup := xcb.get_setup(connection)
 	fmt.printf("setup %v\n", setup)
 
-	screen := xcb.setup_roots_iterator(xcb.get_setup(connection)).data
+	screen := xcb.setup_roots_iterator(setup).data
 	fmt.printf("screen %v\n", screen)
 
 	window := xcb.Window(xcb.generate_id(connection))
@@ -136,8 +136,16 @@ main :: proc() {
 	)
 	defer xcb.destroy_window(connection, window)
 
-	gcontext := xcb.Gcontext(xcb.generate_id(connection))
-	xcb.create_gc(connection, gcontext, xcb.Drawable(window), 0, nil)
+	// NOTE: This seems to be set to 0 until something makes us wait for a bit.
+	// For example: a fmt.printf. Simply moving the fmt.printf to after the
+	// xcb.create_gc will break it, resulting in an invalid gc. Moreover it seems
+	// that gcontext is overridden to 0 if xcb.create_gc is called immediately
+	// after xcb.generate_id. This happens only when all optimizations are turned
+	// off. Slows down earlier calls? Moving the entire block down closer to the
+	// loop start also seems to fix this. Related to window creation flush?
+	// gcontext := xcb.Gcontext(xcb.generate_id(connection))
+	// fmt.printf("gcontext: %d\n", gcontext)
+	// xcb.create_gc(connection, gcontext, xcb.Drawable(window), 0, nil)
 
 	// NOTE: Make sure we get the close window event (when letting decorations close the window etc).
 	protocol_reply := xcb.intern_atom_reply(
@@ -206,6 +214,9 @@ main :: proc() {
 		debug_render_timings: [256]f32
 		debug_highest_timing := f32(1)
 	}
+
+	gcontext := xcb.Gcontext(xcb.generate_id(connection))
+	xcb.create_gc(connection, gcontext, xcb.Drawable(window), 0, nil)
 
 	is_running := true
 	ready_to_blit := true
