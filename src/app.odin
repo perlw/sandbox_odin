@@ -311,10 +311,8 @@ draw_olc_race :: proc(screen_buffer: ^Bitmap) {
 		right_clip := round_i32((mid_point + road_width) * f32(screen_buffer.width))
 		right_grass := round_i32((mid_point + road_width + clip_width) * f32(screen_buffer.width))
 
-		grass_color: u32 = (math.sin(20 * math.pow(1 - perspective, 3) + (pos * 0.1)) >
-		0 ? 0xFF00AA00 : 0xFF006600)
-		clip_color: u32 = (math.sin(80 * math.pow(1 - perspective, 2) + pos) >
-		0 ? 0xFFAA0000 : 0xFFFFFFFF)
+		grass_color: u32 = (math.sin(20 * math.pow(1 - perspective, 3) + (pos * 0.1)) > 0 ? 0xFF00AA00 : 0xFF006600)
+		clip_color: u32 = (math.sin(80 * math.pow(1 - perspective, 2) + pos) > 0 ? 0xFFAA0000 : 0xFFFFFFFF)
 
 		for x: i32 = 0; x < i32(screen_buffer.width); x += 1 {
 			if x >= 0 && x < left_grass {

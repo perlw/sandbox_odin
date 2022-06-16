@@ -54,15 +54,21 @@ resize_backbuffer :: proc(
 	backbuffer.bps = 4
 	backbuffer.pitch = u32(backbuffer.width) * u32(backbuffer.height)
 
-	backbuffer.shm_id = shm.get(shm.IPC_PRIVATE, u32(backbuffer.bps) * backbuffer.pitch, shm.IPC_CREAT |
-		0o600)
+	backbuffer.shm_id = shm.get(shm.IPC_PRIVATE, u32(backbuffer.bps) * backbuffer.pitch, shm.IPC_CREAT | 0o600)
 	backbuffer.memory = shm.at(backbuffer.shm_id, nil, 0)
 
 	xcbshm.attach(connection, backbuffer.shm_seg_id, u32(backbuffer.shm_id), 0)
 	screen := xcb.setup_roots_iterator(xcb.get_setup(connection)).data
-	xcbshm.create_pixmap(connection, backbuffer.pixmap_id, xcb.Drawable(
-			window,
-		), backbuffer.width, backbuffer.height, screen.root_depth, backbuffer.shm_seg_id, 0)
+	xcbshm.create_pixmap(
+		connection,
+		backbuffer.pixmap_id,
+		xcb.Drawable(window),
+		backbuffer.width,
+		backbuffer.height,
+		screen.root_depth,
+		backbuffer.shm_seg_id,
+		0,
+	)
 }
 
 get_clock_value :: #force_inline proc() -> unix.timespec {
@@ -109,11 +115,22 @@ main :: proc() {
 	values: [2]u32
 	mask = u32(xcb.Cw.Event_Mask)
 	values[0] = u32(xcb.EventMask.Exposure | xcb.EventMask.Key_Press | xcb.EventMask.Key_Release)
-	xcb.create_window(connection, xcb.COPY_FROM_PARENT, window, screen.root, 0, 0, 1280, 720, 10, .Input_Output, screen.root_visual, mask, &values[0])
-	defer xcb.destroy_window(
+	xcb.create_window(
 		connection,
+		xcb.COPY_FROM_PARENT,
 		window,
+		screen.root,
+		0,
+		0,
+		1280,
+		720,
+		10,
+		.Input_Output,
+		screen.root_visual,
+		mask,
+		&values[0],
 	)
+	defer xcb.destroy_window(connection, window)
 
 	// NOTE: This seems to be set to 0 until something makes us wait for a bit.
 	// For example: a fmt.printf. Simply moving the fmt.printf to after the
@@ -127,22 +144,11 @@ main :: proc() {
 	// xcb.create_gc(connection, gcontext, xcb.Drawable(window), 0, nil)
 
 	// NOTE: Make sure we get the close window event (when letting decorations close the window etc).
-	protocol_reply := xcb.intern_atom_reply(
-		connection,
-		xcb.intern_atom(connection, 1, 12, "WM_PROTOCOLS"),
-		nil,
-	)
-	delete_window_reply := xcb.intern_atom_reply(
-		connection,
-		xcb.intern_atom(connection, 0, 16, "WM_DELETE_WINDOW"),
-		nil,
-	)
+	protocol_reply := xcb.intern_atom_reply(connection, xcb.intern_atom(connection, 1, 12, "WM_PROTOCOLS"), nil)
+	delete_window_reply := xcb.intern_atom_reply(connection, xcb.intern_atom(connection, 0, 16, "WM_DELETE_WINDOW"), nil)
 	xcb.change_property(connection, .Replace, window, protocol_reply.atom, .Atom, 32, 1, &delete_window_reply.atom)
 
-	xcb.map_window(
-		connection,
-		window,
-	)
+	xcb.map_window(connection, window)
 	xcb.flush(connection)
 
 	// NOTE: SHM support check.
@@ -176,10 +182,7 @@ main :: proc() {
 	fmt.printf("backbuffer[1]: %+v\n", backbuffers[1])
 
 	shm_completion_event := xcb.get_extension_data(connection, &xcbshm.Id).first_event + xcbshm.COMPLETION
-	fmt.printf(
-		"completion event: %d\n",
-		shm_completion_event,
-	)
+	fmt.printf("completion event: %d\n", shm_completion_event)
 
 	game_update_hz := f32(30)
 	target_seconds_per_frame := 1.0 / game_update_hz
@@ -210,9 +213,15 @@ main :: proc() {
 				minor := xcberrors.get_name_for_minor_code(err_ctx, u8(err.major_code), err.minor_code)
 				extension: cstring
 				error := xcberrors.get_name_for_error(err_ctx, err.error_code, &extension)
-				fmt.printf("XCB Error: %s:%s, %s:%s, resource %u sequence %u\n", error, extension !=
-					nil ? extension : "no_extension", major, minor !=
-					nil ? minor : "no_minor", err.resource_id, err.sequence)
+				fmt.printf(
+					"XCB Error: %s:%s, %s:%s, resource %u sequence %u\n",
+					error,
+					extension != nil ? extension : "no_extension",
+					major,
+					minor != nil ? minor : "no_minor",
+					err.resource_id,
+					err.sequence,
+				)
 				xcberrors.context_free(err_ctx)
 
 			case xcb.EXPOSE:
@@ -315,13 +324,26 @@ main :: proc() {
 		if ready_to_blit {
 			ready_to_blit = false
 
-			xcbshm.put_image(connection, xcb.Drawable(
-					window,
-				), gcontext, backbuffer.width, backbuffer.height, 0, 0, backbuffer.width, backbuffer.height, 0, 0, screen.root_depth, .z_pixmap, 1, backbuffer.shm_seg_id, 0)
-
-			xcb.flush(
+			xcbshm.put_image(
 				connection,
+				xcb.Drawable(window),
+				gcontext,
+				backbuffer.width,
+				backbuffer.height,
+				0,
+				0,
+				backbuffer.width,
+				backbuffer.height,
+				0,
+				0,
+				screen.root_depth,
+				.z_pixmap,
+				1,
+				backbuffer.shm_seg_id,
+				0,
 			)
+
+			xcb.flush(connection)
 
 			backbuffer_index = (backbuffer_index + 1) % 2
 			backbuffer = backbuffers[backbuffer_index]
@@ -345,8 +367,7 @@ main :: proc() {
 
 		when DEBUG_DRAW_TIMINGS {
 			ms_per_frame := 1000.0 * get_seconds_elapsed(last_counter, end_counter)
-			frame_render_ms := 1000.0 * get_seconds_elapsed(update_and_render_timing_start, update_and_render_timing_stop
-                      )
+			frame_render_ms := 1000.0 * get_seconds_elapsed(update_and_render_timing_start, update_and_render_timing_stop)
 
 			debug_highest_timing = 0
 			for i := 0; i < 255; i += 1 {

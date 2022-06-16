@@ -304,12 +304,7 @@ foreign xproto {
 		value_list: rawptr,
 	) -> VoidCookie ---
 
-	intern_atom :: proc(
-		connection: ^Connection,
-		only_if_exists: u8,
-		name_len: u16,
-		name: cstring,
-	) -> InternAtomCookie ---
+	intern_atom :: proc(connection: ^Connection, only_if_exists: u8, name_len: u16, name: cstring) -> InternAtomCookie ---
 	intern_atom_reply :: proc(
 		connection: ^Connection,
 		cookie: InternAtomCookie,

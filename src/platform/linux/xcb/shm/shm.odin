@@ -39,12 +39,7 @@ foreign xcb_shm {
 		cookie: QueryVersionCookie,
 		err: ^^xcb.GenericError,
 	) -> ^QueryVersionReply ---
-	attach :: proc(
-		connection: ^xcb.Connection,
-		shm_seg: Seg,
-		shm_id: u32,
-		read_only: u8,
-	) -> xcb.VoidCookie ---
+	attach :: proc(connection: ^xcb.Connection, shm_seg: Seg, shm_id: u32, read_only: u8) -> xcb.VoidCookie ---
 	detach :: proc(connection: ^xcb.Connection, shm_seg: Seg) -> xcb.VoidCookie ---
 	create_pixmap :: proc(
 		connection: ^xcb.Connection,

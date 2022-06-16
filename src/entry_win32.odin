@@ -60,8 +60,12 @@ resize_backbuffer :: proc(backbuffer: ^Backbuffer, width: u32, height: u32) {
 		biCompression = windows.BI_RGB,
 	}
 
-	backbuffer.memory = windows.VirtualAlloc(nil, uint(backbuffer.bps * backbuffer.pitch), windows.MEM_RESERVE |
-		windows.MEM_COMMIT, windows.PAGE_READWRITE)
+	backbuffer.memory = windows.VirtualAlloc(
+		nil,
+		uint(backbuffer.bps * backbuffer.pitch),
+		windows.MEM_RESERVE | windows.MEM_COMMIT,
+		windows.PAGE_READWRITE,
+	)
 }
 
 get_clock_value :: #force_inline proc() -> i64 {
@@ -85,11 +89,21 @@ blit_buffer_in_window :: proc(backbuffer: ^Backbuffer, dc: windows.HDC, width, h
 		windows.PatBlt(dc, 0, 0, offset_x, height, windows.BLACKNESS)
 		windows.PatBlt(dc, width - offset_x, 0, offset_x, height, windows.BLACKNESS)
 	}
-	windows.StretchDIBits(dc, offset_x, 0, fixed_width, height, 0, 0, i32(
-			backbuffer.width,
-		), i32(
-			backbuffer.height,
-		), backbuffer.memory, &backbuffer.bitmap_info, windows.DIB_RGB_COLORS, windows.SRCCOPY)
+	windows.StretchDIBits(
+		dc,
+		offset_x,
+		0,
+		fixed_width,
+		height,
+		0,
+		0,
+		i32(backbuffer.width),
+		i32(backbuffer.height),
+		backbuffer.memory,
+		&backbuffer.bitmap_info,
+		windows.DIB_RGB_COLORS,
+		windows.SRCCOPY,
+	)
 }
 
 TIMERR_BASE :: 96
@@ -284,8 +298,7 @@ main :: proc() {
 
 		when DEBUG_DRAW_TIMINGS {
 			ms_per_frame := 1000.0 * get_seconds_elapsed(last_counter, end_counter)
-			frame_render_ms := 1000.0 * get_seconds_elapsed(update_and_render_timing_start, update_and_render_timing_stop
-                      )
+			frame_render_ms := 1000.0 * get_seconds_elapsed(update_and_render_timing_start, update_and_render_timing_stop)
 
 			debug_highest_timing = 0
 			for i := 0; i < 255; i += 1 {
