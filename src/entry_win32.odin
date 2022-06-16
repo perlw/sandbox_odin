@@ -13,8 +13,7 @@ window_proc :: proc "std" (
 	msg: u32,
 	wparam: windows.WPARAM,
 	lparam: windows.LPARAM,
-) -> windows.LRESULT {
-	result: windows.LRESULT
+) -> windows.LRESULT {result: windows.LRESULT
 
 	switch msg {
 	case windows.WM_DESTROY:
@@ -111,17 +110,17 @@ TIMERR_NOCANDO :: TIMERR_BASE + 1
 TIMERR_NOERROR :: 0
 
 input_key_translation := map[uint]AppInputKey {
-	.VK_ESCAPE = .Escape,
-	.VK_0      = .Num0,
-	.VK_1      = .Num1,
-	.VK_2      = .Num2,
-	.VK_3      = .Num3,
-	.VK_4      = .Num4,
-	.VK_5      = .Num5,
-	.VK_6      = .Num6,
-	.VK_7      = .Num7,
-	.VK_8      = .Num8,
-	.VK_9      = .Num9,
+	windows.VK_ESCAPE = .Escape,
+	windows.VK_0      = .Num0,
+	windows.VK_1      = .Num1,
+	windows.VK_2      = .Num2,
+	windows.VK_3      = .Num3,
+	windows.VK_4      = .Num4,
+	windows.VK_5      = .Num5,
+	windows.VK_6      = .Num6,
+	windows.VK_7      = .Num7,
+	windows.VK_8      = .Num8,
+	windows.VK_9      = .Num9,
 }
 
 main :: proc() {
