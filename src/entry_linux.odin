@@ -54,25 +54,15 @@ resize_backbuffer :: proc(
 	backbuffer.bps = 4
 	backbuffer.pitch = u32(backbuffer.width) * u32(backbuffer.height)
 
-	backbuffer.shm_id = shm.get(
-		shm.IPC_PRIVATE,
-		u32(backbuffer.bps) * backbuffer.pitch,
-		shm.IPC_CREAT | 0o600,
-	)
+	backbuffer.shm_id = shm.get(shm.IPC_PRIVATE, u32(backbuffer.bps) * backbuffer.pitch, shm.IPC_CREAT |
+		0o600)
 	backbuffer.memory = shm.at(backbuffer.shm_id, nil, 0)
 
 	xcbshm.attach(connection, backbuffer.shm_seg_id, u32(backbuffer.shm_id), 0)
 	screen := xcb.setup_roots_iterator(xcb.get_setup(connection)).data
-	xcbshm.create_pixmap(
-		connection,
-		backbuffer.pixmap_id,
-		xcb.Drawable(window),
-		backbuffer.width,
-		backbuffer.height,
-		screen.root_depth,
-		backbuffer.shm_seg_id,
-		0,
-	)
+	xcbshm.create_pixmap(connection, backbuffer.pixmap_id, xcb.Drawable(
+			window,
+		), backbuffer.width, backbuffer.height, screen.root_depth, backbuffer.shm_seg_id, 0)
 }
 
 get_clock_value :: #force_inline proc() -> unix.timespec {
@@ -85,18 +75,18 @@ get_seconds_elapsed :: #force_inline proc(start, end: unix.timespec) -> f32 {
 	return f32(end.tv_sec - start.tv_sec) + (f32(end.tv_nsec - start.tv_nsec) / 1000000000.0)
 }
 
-input_key_translation := map[X11.Key_Code]AppInputKey{
-	X11.Key_Code.Escape = AppInputKey.Escape,
-	X11.Key_Code.Num0   = AppInputKey.Num0,
-	X11.Key_Code.Num1   = AppInputKey.Num1,
-	X11.Key_Code.Num2   = AppInputKey.Num2,
-	X11.Key_Code.Num3   = AppInputKey.Num3,
-	X11.Key_Code.Num4   = AppInputKey.Num4,
-	X11.Key_Code.Num5   = AppInputKey.Num5,
-	X11.Key_Code.Num6   = AppInputKey.Num6,
-	X11.Key_Code.Num7   = AppInputKey.Num7,
-	X11.Key_Code.Num8   = AppInputKey.Num8,
-	X11.Key_Code.Num9   = AppInputKey.Num9,
+input_key_translation := map[X11.Key_Code]AppInputKey {
+	.Escape = .Escape,
+	.Num0   = .Num0,
+	.Num1   = .Num1,
+	.Num2   = .Num2,
+	.Num3   = .Num3,
+	.Num4   = .Num4,
+	.Num5   = .Num5,
+	.Num6   = .Num6,
+	.Num7   = .Num7,
+	.Num8   = .Num8,
+	.Num9   = .Num9,
 }
 
 main :: proc() {
@@ -119,22 +109,11 @@ main :: proc() {
 	values: [2]u32
 	mask = u32(xcb.Cw.Event_Mask)
 	values[0] = u32(xcb.EventMask.Exposure | xcb.EventMask.Key_Press | xcb.EventMask.Key_Release)
-	xcb.create_window(
+	xcb.create_window(connection, xcb.COPY_FROM_PARENT, window, screen.root, 0, 0, 1280, 720, 10, .Input_Output, screen.root_visual, mask, &values[0])
+	defer xcb.destroy_window(
 		connection,
-		xcb.COPY_FROM_PARENT,
 		window,
-		screen.root,
-		0,
-		0,
-		1280,
-		720,
-		10,
-		.Input_Output,
-		screen.root_visual,
-		mask,
-		&values[0],
 	)
-	defer xcb.destroy_window(connection, window)
 
 	// NOTE: This seems to be set to 0 until something makes us wait for a bit.
 	// For example: a fmt.printf. Simply moving the fmt.printf to after the
@@ -158,18 +137,12 @@ main :: proc() {
 		xcb.intern_atom(connection, 0, 16, "WM_DELETE_WINDOW"),
 		nil,
 	)
-	xcb.change_property(
-		connection,
-		.Replace,
-		window,
-		protocol_reply.atom,
-		.Atom,
-		32,
-		1,
-		&delete_window_reply.atom,
-	)
+	xcb.change_property(connection, .Replace, window, protocol_reply.atom, .Atom, 32, 1, &delete_window_reply.atom)
 
-	xcb.map_window(connection, window)
+	xcb.map_window(
+		connection,
+		window,
+	)
 	xcb.flush(connection)
 
 	// NOTE: SHM support check.
@@ -203,7 +176,10 @@ main :: proc() {
 	fmt.printf("backbuffer[1]: %+v\n", backbuffers[1])
 
 	shm_completion_event := xcb.get_extension_data(connection, &xcbshm.Id).first_event + xcbshm.COMPLETION
-	fmt.printf("completion event: %d\n", shm_completion_event)
+	fmt.printf(
+		"completion event: %d\n",
+		shm_completion_event,
+	)
 
 	game_update_hz := f32(30)
 	target_seconds_per_frame := 1.0 / game_update_hz
@@ -234,15 +210,9 @@ main :: proc() {
 				minor := xcberrors.get_name_for_minor_code(err_ctx, u8(err.major_code), err.minor_code)
 				extension: cstring
 				error := xcberrors.get_name_for_error(err_ctx, err.error_code, &extension)
-				fmt.printf(
-					"XCB Error: %s:%s, %s:%s, resource %u sequence %u\n",
-					error,
-					extension != nil ? extension : "no_extension",
-					major,
-					minor != nil ? minor : "no_minor",
-					err.resource_id,
-					err.sequence,
-				)
+				fmt.printf("XCB Error: %s:%s, %s:%s, resource %u sequence %u\n", error, extension !=
+					nil ? extension : "no_extension", major, minor !=
+					nil ? minor : "no_minor", err.resource_id, err.sequence)
 				xcberrors.context_free(err_ctx)
 
 			case xcb.EXPOSE:
@@ -345,26 +315,13 @@ main :: proc() {
 		if ready_to_blit {
 			ready_to_blit = false
 
-			xcbshm.put_image(
-				connection,
-				xcb.Drawable(window),
-				gcontext,
-				backbuffer.width,
-				backbuffer.height,
-				0,
-				0,
-				backbuffer.width,
-				backbuffer.height,
-				0,
-				0,
-				screen.root_depth,
-				.z_pixmap,
-				1,
-				backbuffer.shm_seg_id,
-				0,
-			)
+			xcbshm.put_image(connection, xcb.Drawable(
+					window,
+				), gcontext, backbuffer.width, backbuffer.height, 0, 0, backbuffer.width, backbuffer.height, 0, 0, screen.root_depth, .z_pixmap, 1, backbuffer.shm_seg_id, 0)
 
-			xcb.flush(connection)
+			xcb.flush(
+				connection,
+			)
 
 			backbuffer_index = (backbuffer_index + 1) % 2
 			backbuffer = backbuffers[backbuffer_index]
@@ -388,9 +345,7 @@ main :: proc() {
 
 		when DEBUG_DRAW_TIMINGS {
 			ms_per_frame := 1000.0 * get_seconds_elapsed(last_counter, end_counter)
-			frame_render_ms := 1000.0 * get_seconds_elapsed(
-	                      update_and_render_timing_start,
-	                      update_and_render_timing_stop,
+			frame_render_ms := 1000.0 * get_seconds_elapsed(update_and_render_timing_start, update_and_render_timing_stop
                       )
 
 			debug_highest_timing = 0

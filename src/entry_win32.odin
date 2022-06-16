@@ -56,16 +56,12 @@ resize_backbuffer :: proc(backbuffer: ^Backbuffer, width: u32, height: u32) {
 		biWidth       = i32(width),
 		biHeight      = -i32(height),
 		biPlanes      = 1,
-		biBitCount   = 32,
+		biBitCount    = 32,
 		biCompression = windows.BI_RGB,
 	}
 
-	backbuffer.memory = windows.VirtualAlloc(
-		nil,
-		uint(backbuffer.bps * backbuffer.pitch),
-		windows.MEM_RESERVE | windows.MEM_COMMIT,
-		windows.PAGE_READWRITE,
-	)
+	backbuffer.memory = windows.VirtualAlloc(nil, uint(backbuffer.bps * backbuffer.pitch), windows.MEM_RESERVE |
+		windows.MEM_COMMIT, windows.PAGE_READWRITE)
 }
 
 get_clock_value :: #force_inline proc() -> i64 {
@@ -89,39 +85,29 @@ blit_buffer_in_window :: proc(backbuffer: ^Backbuffer, dc: windows.HDC, width, h
 		windows.PatBlt(dc, 0, 0, offset_x, height, windows.BLACKNESS)
 		windows.PatBlt(dc, width - offset_x, 0, offset_x, height, windows.BLACKNESS)
 	}
-	windows.StretchDIBits(
-		dc,
-		offset_x,
-		0,
-		fixed_width,
-		height,
-		0,
-		0,
-		i32(backbuffer.width),
-		i32(backbuffer.height),
-		backbuffer.memory,
-		&backbuffer.bitmap_info,
-		windows.DIB_RGB_COLORS,
-		windows.SRCCOPY,
-	)
+	windows.StretchDIBits(dc, offset_x, 0, fixed_width, height, 0, 0, i32(
+			backbuffer.width,
+		), i32(
+			backbuffer.height,
+		), backbuffer.memory, &backbuffer.bitmap_info, windows.DIB_RGB_COLORS, windows.SRCCOPY)
 }
 
 TIMERR_BASE :: 96
 TIMERR_NOCANDO :: TIMERR_BASE + 1
 TIMERR_NOERROR :: 0
 
-input_key_translation := map[uint]AppInputKey{
-	windows.VK_ESCAPE = AppInputKey.Escape,
-	windows.VK_0			= AppInputKey.Num0,
-	windows.VK_1			= AppInputKey.Num1,
-	windows.VK_2			= AppInputKey.Num2,
-	windows.VK_3			= AppInputKey.Num3,
-	windows.VK_4			= AppInputKey.Num4,
-	windows.VK_5			= AppInputKey.Num5,
-	windows.VK_6			= AppInputKey.Num6,
-	windows.VK_7			= AppInputKey.Num7,
-	windows.VK_8			= AppInputKey.Num8,
-	windows.VK_9			= AppInputKey.Num9,
+input_key_translation := map[uint]AppInputKey {
+	.VK_ESCAPE = .Escape,
+	.VK_0      = .Num0,
+	.VK_1      = .Num1,
+	.VK_2      = .Num2,
+	.VK_3      = .Num3,
+	.VK_4      = .Num4,
+	.VK_5      = .Num5,
+	.VK_6      = .Num6,
+	.VK_7      = .Num7,
+	.VK_8      = .Num8,
+	.VK_9      = .Num9,
 }
 
 main :: proc() {
@@ -140,10 +126,10 @@ main :: proc() {
 
 	class_name := windows.utf8_to_wstring("sandboxwindowsplatform_odin")
 	window_class := windows.WNDCLASSW {
-		style					= windows.CS_OWNDC | windows.CS_HREDRAW | windows.CS_VREDRAW,
+		style         = windows.CS_OWNDC | windows.CS_HREDRAW | windows.CS_VREDRAW,
 		lpfnWndProc   = window_proc,
-		hInstance			= windows.HINSTANCE(hinstance),
-		hCursor				= windows.LoadCursorW(nil, ([^]u16)(windows._IDC_ARROW)),
+		hInstance     = windows.HINSTANCE(hinstance),
+		hCursor       = windows.LoadCursorW(nil, ([^]u16)(windows._IDC_ARROW)),
 		lpszClassName = class_name,
 	}
 	fmt.printf("window_class %v\n", window_class)
@@ -298,9 +284,7 @@ main :: proc() {
 
 		when DEBUG_DRAW_TIMINGS {
 			ms_per_frame := 1000.0 * get_seconds_elapsed(last_counter, end_counter)
-			frame_render_ms := 1000.0 * get_seconds_elapsed(
-	                      update_and_render_timing_start,
-	                      update_and_render_timing_stop,
+			frame_render_ms := 1000.0 * get_seconds_elapsed(update_and_render_timing_start, update_and_render_timing_stop
                       )
 
 			debug_highest_timing = 0
