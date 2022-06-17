@@ -179,11 +179,14 @@ main :: proc() {
 	}
 	defer windows.DestroyWindow(window)
 
-	backbuffer: Backbuffer
-	fmt.printf("backbuffer: %+v\n", backbuffer)
-	resize_backbuffer(&backbuffer, 1280, 720)
-	defer windows.VirtualFree(backbuffer.memory, 0, windows.MEM_RELEASE)
-	fmt.printf("backbuffer: %+v\n", backbuffer)
+	backbuffer_index: u32
+	backbuffers: [2]Backbuffer
+	resize_backbuffer(&backbuffers[0], 1280, 720)
+	resize_backbuffer(&backbuffers[1], 1280, 720)
+	defer windows.VirtualFree(backbuffers[0].memory, 0, windows.MEM_RELEASE)
+	defer windows.VirtualFree(backbuffers[1].memory, 0, windows.MEM_RELEASE)
+	fmt.printf("backbuffer[0]: %+v\n", backbuffers[0])
+	fmt.printf("backbuffer[1]: %+v\n", backbuffers[1])
 
 	game_update_hz := f32(30)
 	target_seconds_per_frame := 1.0 / game_update_hz
@@ -221,6 +224,8 @@ main :: proc() {
 			}
 		}
 
+		backbuffer := &backbuffers[backbuffer_index]
+		backbuffer_index = (backbuffer_index + 1) % 2
 		screen_buffer := Bitmap {
 			buffer = ([^]u32)(backbuffer.memory)[0:backbuffer.pitch],
 			width  = backbuffer.width,
@@ -275,7 +280,7 @@ main :: proc() {
 		windows.GetClientRect(window, &client_rect)
 		dim_width := client_rect.right - client_rect.left
 		dim_height := client_rect.bottom - client_rect.top
-		blit_buffer_in_window(&backbuffer, dc, dim_width, dim_height)
+		blit_buffer_in_window(backbuffer, dc, dim_width, dim_height)
 		windows.ReleaseDC(window, dc)
 
 		elapsed := get_seconds_elapsed(last_counter, get_clock_value())
