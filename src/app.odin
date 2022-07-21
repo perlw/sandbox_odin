@@ -88,7 +88,7 @@ draw_xor :: proc(bitmap: ^Bitmap) {
 
 	i: u32
 	for y := u32(0); y < bitmap.height; y += 1 {
-		for x: u32 = 0; x < bitmap.width; x += 1 {
+		for x := u32(0); x < bitmap.width; x += 1 {
 			c := u8(((x + offset) ~ (y + offset)) % 256)
 			bitmap.buffer[i] = color_u32(c, c, c, 0xFF)
 			i += 1
@@ -123,8 +123,8 @@ draw_slow_circles :: proc(bitmap: ^Bitmap) {
 	}
 }
 
-Fixed_Width :: 1280
-Fixed_Height :: 720
+Fixed_Width :: 1920 / 2
+Fixed_Height :: 1080 / 2
 
 draw_fast_circles :: proc(bitmap: ^Bitmap) {
 	@(static)
@@ -338,12 +338,6 @@ draw_olc_race :: proc(screen_buffer: ^Bitmap) {
 }
 
 // Credit to:
-//  http://www.extentofthejam.com/pseudo/
-//  https://codeincomplete.com/articles/javascript-racer-v1-straight/
-draw_joe_race :: proc(screen_buffer: ^Bitmap) {
-}
-
-// Credit to:
 //  https://github.com/s-macke/VoxelSpace
 draw_voxel_space :: proc(screen_buffer: ^Bitmap) {
 }
@@ -361,7 +355,6 @@ scene_funcs := []proc(_: ^Bitmap){
 	draw_plasma,
 	draw_line_tests,
 	draw_olc_race,
-	draw_joe_race,
 	draw_voxel_space,
 }
 
@@ -391,9 +384,6 @@ app_update_and_render :: proc(screen_buffer: ^Bitmap, input: ^AppInput) {
 		mem.zero_slice(screen_buffer.buffer)
 	} else if input.keyboard[AppInputKey.Num7].down {
 		scene_num = 6
-		mem.zero_slice(screen_buffer.buffer)
-	} else if input.keyboard[AppInputKey.Num8].down {
-		scene_num = 7
 		mem.zero_slice(screen_buffer.buffer)
 	}
 

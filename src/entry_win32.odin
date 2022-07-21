@@ -14,15 +14,16 @@ window_proc :: proc "std" (
 	wparam: windows.WPARAM,
 	lparam: windows.LPARAM,
 ) -> windows.LRESULT {result: windows.LRESULT
-
 	switch msg {
 	case windows.WM_DESTROY:
 		global_is_running = false
-		windows.OutputDebugStringW("WM_DESTROY\n")
+		msg := cstring("WM_DESTROY\n")
+		windows.OutputDebugStringW(([^]u16)(&msg))
 
 	case windows.WM_CLOSE:
 		global_is_running = false
-		windows.OutputDebugStringW("WM_CLOSE\n")
+		msg := cstring("WM_CLOSE\n")
+		windows.OutputDebugStringW(([^]u16)(&msg))
 
 	case:
 		result = windows.DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -148,7 +149,8 @@ main :: proc() {
 	fmt.printf("window_class %v\n", window_class)
 
 	if windows.RegisterClassW(&window_class) == 0 {
-		windows.OutputDebugStringW("could not register class\n")
+		msg := cstring("could not register class\n")
+		windows.OutputDebugStringW(([^]u16)(&msg))
 	}
 
 	wsize := windows.RECT {
@@ -174,15 +176,18 @@ main :: proc() {
 	)
 
 	if window == nil {
-		windows.OutputDebugStringW("could not create window\n")
+		msg := cstring("could not create window\n")
+		windows.OutputDebugStringW(([^]u16)(&msg))
 		return
 	}
 	defer windows.DestroyWindow(window)
 
+	backbuffer_width :: 1920 / 2
+	backbuffer_height :: 1080 / 2
 	backbuffer_index: u32
 	backbuffers: [2]Backbuffer
-	resize_backbuffer(&backbuffers[0], 1280, 720)
-	resize_backbuffer(&backbuffers[1], 1280, 720)
+	resize_backbuffer(&backbuffers[0], backbuffer_width, backbuffer_height)
+	resize_backbuffer(&backbuffers[1], backbuffer_width, backbuffer_height)
 	defer windows.VirtualFree(backbuffers[0].memory, 0, windows.MEM_RELEASE)
 	defer windows.VirtualFree(backbuffers[1].memory, 0, windows.MEM_RELEASE)
 	fmt.printf("backbuffer[0]: %+v\n", backbuffers[0])
@@ -199,16 +204,20 @@ main :: proc() {
 	}
 
 	input: AppInput
+	dc := windows.GetDC(window)
+	defer windows.ReleaseDC(window, dc)
 	for global_is_running {
 		message: windows.MSG
 		for windows.PeekMessageW(&message, window, 0, 0, windows.PM_REMOVE) {
 			switch message.message {
 			case windows.WM_QUIT:
 				global_is_running = false
-				windows.OutputDebugStringW("WM_QUIT\n")
+				msg := cstring("WM_QUIT\n")
+				windows.OutputDebugStringW(([^]u16)(&msg))
 
 			case windows.WM_SYSKEYDOWN, windows.WM_SYSKEYUP, windows.WM_KEYDOWN, windows.WM_KEYUP:
-				windows.OutputDebugStringW("WM_SYS/KEY\n")
+				msg := cstring("WM_SYS/KEY\n")
+				windows.OutputDebugStringW(([^]u16)(&msg))
 				key_code := uint(message.wParam)
 				if key_code == windows.VK_ESCAPE {
 					global_is_running = false
@@ -275,14 +284,6 @@ main :: proc() {
 			}
 		}
 
-		dc := windows.GetDC(window)
-		client_rect: windows.RECT
-		windows.GetClientRect(window, &client_rect)
-		dim_width := client_rect.right - client_rect.left
-		dim_height := client_rect.bottom - client_rect.top
-		blit_buffer_in_window(backbuffer, dc, dim_width, dim_height)
-		windows.ReleaseDC(window, dc)
-
 		elapsed := get_seconds_elapsed(last_counter, get_clock_value())
 		if elapsed < target_seconds_per_frame {
 			if sleep_is_granular {
@@ -298,11 +299,17 @@ main :: proc() {
 		} else {
 			fmt.printf("missed sleep\n")
 		}
-		end_counter := get_clock_value()
+
+		client_rect: windows.RECT
+		windows.GetClientRect(window, &client_rect)
+		dim_width := client_rect.right - client_rect.left
+		dim_height := client_rect.bottom - client_rect.top
+		blit_buffer_in_window(backbuffer, dc, dim_width, dim_height)
 
 		when DEBUG_DRAW_TIMINGS {
-			ms_per_frame := 1000.0 * get_seconds_elapsed(last_counter, end_counter)
-			frame_render_ms := 1000.0 * get_seconds_elapsed(update_and_render_timing_start, update_and_render_timing_stop)
+			ms_per_frame := 1000.0 * elapsed
+			frame_render_ms :=
+				1000.0 * get_seconds_elapsed(update_and_render_timing_start, update_and_render_timing_stop)
 
 			debug_highest_timing = 0
 			for i := 0; i < 255; i += 1 {
@@ -325,6 +332,6 @@ main :: proc() {
 			}
 		}
 
-		last_counter = end_counter
+		last_counter = get_clock_value()
 	}
 }
