@@ -122,8 +122,8 @@ main :: proc() {
 		screen.root,
 		0,
 		0,
-		1280,
-		720,
+		960,
+		540,
 		10,
 		.Input_Output,
 		screen.root_visual,
@@ -145,18 +145,19 @@ main :: proc() {
 
 	// NOTE: Make sure we get the close window event (when letting decorations close the window etc).
 	protocol_reply := xcb.intern_atom_reply(connection, xcb.intern_atom(connection, 1, 12, "WM_PROTOCOLS"), nil)
-	delete_window_reply := xcb.intern_atom_reply(connection, xcb.intern_atom(connection, 0, 16, "WM_DELETE_WINDOW"), nil)
+	delete_window_reply := xcb.intern_atom_reply(
+		connection,
+		xcb.intern_atom(connection, 0, 16, "WM_DELETE_WINDOW"),
+		nil,
+	)
 	xcb.change_property(connection, .Replace, window, protocol_reply.atom, .Atom, 32, 1, &delete_window_reply.atom)
 
 	xcb.map_window(connection, window)
 	xcb.flush(connection)
 
 	// NOTE: SHM support check.
-	if reply := xcbshm.query_version_reply(
-		   connection,
-		   xcbshm.query_version(connection),
-		   nil,
-	   ); reply == nil || reply.shared_pixmaps == 0 {
+	if reply := xcbshm.query_version_reply(connection, xcbshm.query_version(connection), nil); reply == nil ||
+		   reply.shared_pixmaps == 0 {
 		fmt.printf("Shm missing?\n")
 	} else {
 		fmt.printf("Shm: %v\n", reply)
@@ -167,8 +168,8 @@ main :: proc() {
 
 	backbuffers: [2]Backbuffer
 	backbuffer_index := 0
-	resize_backbuffer(&backbuffers[0], connection, window, 1280, 720)
-	resize_backbuffer(&backbuffers[1], connection, window, 1280, 720)
+	resize_backbuffer(&backbuffers[0], connection, window, 960, 540)
+	resize_backbuffer(&backbuffers[1], connection, window, 960, 540)
 	defer shm.ctl(backbuffers[0].shm_id, shm.IPC_RMID, nil)
 	defer shm.dt(backbuffers[0].memory)
 	defer xcbshm.detach(connection, backbuffers[0].shm_seg_id)
@@ -367,7 +368,8 @@ main :: proc() {
 
 		when DEBUG_DRAW_TIMINGS {
 			ms_per_frame := 1000.0 * get_seconds_elapsed(last_counter, end_counter)
-			frame_render_ms := 1000.0 * get_seconds_elapsed(update_and_render_timing_start, update_and_render_timing_stop)
+			frame_render_ms :=
+				1000.0 * get_seconds_elapsed(update_and_render_timing_start, update_and_render_timing_stop)
 
 			debug_highest_timing = 0
 			for i := 0; i < 255; i += 1 {

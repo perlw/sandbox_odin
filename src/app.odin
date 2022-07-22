@@ -87,8 +87,8 @@ draw_xor :: proc(bitmap: ^Bitmap) {
 	offset: u32 = 0
 
 	i: u32
-	for y := u32(0); y < bitmap.height; y += 1 {
-		for x := u32(0); x < bitmap.width; x += 1 {
+	for y: u32; y < bitmap.height; y += 1 {
+		for x: u32; x < bitmap.width; x += 1 {
 			c := u8(((x + offset) ~ (y + offset)) % 256)
 			bitmap.buffer[i] = color_u32(c, c, c, 0xFF)
 			i += 1
@@ -107,8 +107,8 @@ draw_slow_circles :: proc(bitmap: ^Bitmap) {
 	scale_speed: f32 = 0.3
 
 	i: u32
-	for y := u32(0); y < bitmap.height; y += 1 {
-		for x: u32 = 0; x < bitmap.width; x += 1 {
+	for y: u32; y < bitmap.height; y += 1 {
+		for x: u32; x < bitmap.width; x += 1 {
 			c := u8(128 + (math.sin(f32((x * x) + (y * y) + offset) / scale) * 127))
 			bitmap.buffer[i] = color_u32(c, c, c, 0xFF)
 			i += 1
@@ -123,8 +123,8 @@ draw_slow_circles :: proc(bitmap: ^Bitmap) {
 	}
 }
 
-Fixed_Width :: 1920 / 2
-Fixed_Height :: 1080 / 2
+Fixed_Width :: 960
+Fixed_Height :: 540
 
 draw_fast_circles :: proc(bitmap: ^Bitmap) {
 	@(static)
@@ -142,8 +142,8 @@ draw_fast_circles :: proc(bitmap: ^Bitmap) {
 	buffer: [Fixed_Width * Fixed_Height]u8
 	if buffer[0] == 0 {
 		i: u32
-		for y := u32(0); y < Fixed_Height; y += 1 {
-			for x: u32 = 0; x < Fixed_Width; x += 1 {
+		for y: u32; y < Fixed_Height; y += 1 {
+			for x: u32; x < Fixed_Width; x += 1 {
 				c := u8(128 + (math.sin(f32((x * x) + (y * y)) / scale) * 127))
 				buffer[i] = c
 				i += 1
@@ -172,8 +172,8 @@ draw_plasma :: proc(bitmap: ^Bitmap) {
 	buffer: [Fixed_Width * Fixed_Height]u8
 	if buffer[0] == 0 {
 		i: u32
-		for y := u32(0); y < Fixed_Height; y += 1 {
-			for x: u32 = 0; x < Fixed_Width; x += 1 {
+		for y: u32; y < Fixed_Height; y += 1 {
+			for x: u32; x < Fixed_Width; x += 1 {
 				c := u8((128 + (math.sin(f32(x) / 16) * 128) + 128 + (math.sin(f32(y) / 16) * 128)) / 2)
 				buffer[i] = c
 				i += 1
@@ -283,13 +283,13 @@ draw_olc_race :: proc(screen_buffer: ^Bitmap) {
 
 	horizon := i32(screen_buffer.height / 2)
 	// Sky
-	for y: i32 = 0; y < horizon; y += 1 {
+	for y: i32; y < horizon; y += 1 {
 		color: u32 = (y < horizon / 2 ? 0xFF000033 : 0xFF000066)
-		for x: i32 = 0; x < i32(screen_buffer.width); x += 1 {
+		for x: i32; x < i32(screen_buffer.width); x += 1 {
 			screen_buffer.buffer[(y * i32(screen_buffer.width)) + x] = color
 		}
 	}
-	for x: i32 = 0; x < i32(screen_buffer.width); x += 1 {
+	for x: i32; x < i32(screen_buffer.width); x += 1 {
 		hill_height := abs(i32(math.sin((f32(x) * 0.0025) + track_curve) * 64))
 		for y: i32 = horizon - hill_height; y < i32(screen_buffer.height); y += 1 {
 			screen_buffer.buffer[(y * i32(screen_buffer.width)) + x] = 0xFF003300
@@ -298,7 +298,7 @@ draw_olc_race :: proc(screen_buffer: ^Bitmap) {
 
 	// Track
 	i := horizon * i32(screen_buffer.width)
-	for y: i32 = 0; y < horizon; y += 1 {
+	for y: i32; y < horizon; y += 1 {
 		perspective := f32(y) / f32(horizon)
 		mid_point: f32 = 0.5 + (track_curve * math.pow(1 - perspective, 3))
 
@@ -314,7 +314,7 @@ draw_olc_race :: proc(screen_buffer: ^Bitmap) {
 		grass_color: u32 = (math.sin(20 * math.pow(1 - perspective, 3) + (pos * 0.1)) > 0 ? 0xFF00AA00 : 0xFF006600)
 		clip_color: u32 = (math.sin(80 * math.pow(1 - perspective, 2) + pos) > 0 ? 0xFFAA0000 : 0xFFFFFFFF)
 
-		for x: i32 = 0; x < i32(screen_buffer.width); x += 1 {
+		for x: i32; x < i32(screen_buffer.width); x += 1 {
 			if x >= 0 && x < left_grass {
 				screen_buffer.buffer[i] = grass_color
 			}
