@@ -1,6 +1,6 @@
 #!/bin/sh
 
-bin_name=`basename $0`
+bin_name=`basename $(pwd)`
 
 bold_white="[1;37m"
 bold_green="[1;32m"

@@ -254,7 +254,12 @@ glyph :: struct {
 
 @(init)
 initial :: proc() {
-	data, ok := os.read_entire_file_from_filename("C:\\Windows\\Fonts\\arialbd.ttf")
+	when ODIN_OS == .Windows {
+		data, ok := os.read_entire_file_from_filename("C:\\Windows\\Fonts\\arialbd.ttf")
+	}
+	when ODIN_OS == .Linux {
+		data, ok := os.read_entire_file_from_filename("/usr/share/fonts/TTF/OpenSans-Regular.ttf")
+	}
 	if !ok {
 		fmt.println("fail reading font")
 		return
