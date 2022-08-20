@@ -3,6 +3,12 @@ package main
 import "core:math"
 import "core:math/linalg"
 import "core:mem"
+import "core:os"
+import "core:c"
+
+import "core:fmt"
+import stbtt "vendor:stb/truetype"
+//import "vendor:microui"
 
 color_u32 :: #force_inline proc(r, g, b, a: u8) -> u32 {
 	return (u32(a) << 24) + (u32(r) << 16) + (u32(g) << 8) + u32(b)
@@ -19,7 +25,7 @@ abs :: proc(a: i32) -> i32 {
 
 clamp :: proc(a, min, max: i32) -> i32 {
 	t := (a < min ? min : a)
-	return (t > max ? max : t)
+	return t > max ? max : t
 }
 
 draw_line :: proc(bitmap: ^Bitmap, x1, y1, x2, y2: i32, color: u32) {
@@ -98,31 +104,6 @@ draw_xor :: proc(bitmap: ^Bitmap) {
 	offset += 2
 }
 
-draw_slow_circles :: proc(bitmap: ^Bitmap) {
-	@(static)
-	offset: u32 = 0
-	@(static)
-	scale: f32 = 256
-	@(static)
-	scale_speed: f32 = 0.3
-
-	i: u32
-	for y: u32; y < bitmap.height; y += 1 {
-		for x: u32; x < bitmap.width; x += 1 {
-			c := u8(128 + (math.sin(f32((x * x) + (y * y) + offset) / scale) * 127))
-			bitmap.buffer[i] = color_u32(c, c, c, 0xFF)
-			i += 1
-		}
-	}
-
-	offset += 2
-	scale -= scale_speed
-	if scale <= 1.0 {
-		scale = 1.0
-		scale_speed = -scale_speed
-	}
-}
-
 Fixed_Width :: 960
 Fixed_Height :: 540
 
@@ -174,7 +155,10 @@ draw_plasma :: proc(bitmap: ^Bitmap) {
 		i: u32
 		for y: u32; y < Fixed_Height; y += 1 {
 			for x: u32; x < Fixed_Width; x += 1 {
-				c := u8((128 + (math.sin(f32(x) / 16) * 128) + 128 + (math.sin(f32(y) / 16) * 128)) / 2)
+				c := u8(
+					(128 + (math.sin(f32(x) / 16) * 128) + 128 + (math.sin(f32(y) / 16) * 128)) /
+					2,
+				)
 				buffer[i] = c
 				i += 1
 			}
@@ -231,132 +215,13 @@ draw_line_tests :: proc(screen_buffer: ^Bitmap) {
 	}
 }
 
-TrackPiece :: struct {
-	curvature: f32,
-	length:    f32,
-}
-
-// Credit to:
-//  Code-It-Yourself! Retro Arcade Racing Game - Programming from Scratch (Quick and Simple C++)
-//  https://www.youtube.com/watch?v=KkMZI5Jbf18
-draw_olc_race :: proc(screen_buffer: ^Bitmap) {
-	@(static)
-	pos: f32
-	@(static)
-	track_curve: f32
-	@(static)
-	track: []TrackPiece = {
-		{0, 10},
-		{0, 200},
-		{1, 200},
-		{0, 400},
-		{-1, 100},
-		{0, 200},
-		{-1, 200},
-		{1, 200},
-		{0, 200},
-		{0.2, 500},
-		{0, 200},
-	}
-	@(static)
-	track_distance: f32
-	if track_distance <= 0 {
-		for section in track {
-			track_distance += section.length
-		}
-	}
-
-	if pos >= track_distance {
-		pos -= track_distance
-	}
-
-	offset: f32 = 0
-	track_section := 0
-	for track_section < len(track) && offset <= pos {
-		offset += track[track_section].length
-		track_section += 1
-	}
-	target_curve := track[track_section - 1].curvature
-	track_curve += (target_curve - track_curve) * 0.0333 // ~30fps
-
-	mem.zero_slice(screen_buffer.buffer)
-
-	horizon := i32(screen_buffer.height / 2)
-	// Sky
-	for y: i32; y < horizon; y += 1 {
-		color: u32 = (y < horizon / 2 ? 0xFF000033 : 0xFF000066)
-		for x: i32; x < i32(screen_buffer.width); x += 1 {
-			screen_buffer.buffer[(y * i32(screen_buffer.width)) + x] = color
-		}
-	}
-	for x: i32; x < i32(screen_buffer.width); x += 1 {
-		hill_height := abs(i32(math.sin((f32(x) * 0.0025) + track_curve) * 64))
-		for y: i32 = horizon - hill_height; y < i32(screen_buffer.height); y += 1 {
-			screen_buffer.buffer[(y * i32(screen_buffer.width)) + x] = 0xFF003300
-		}
-	}
-
-	// Track
-	i := horizon * i32(screen_buffer.width)
-	for y: i32; y < horizon; y += 1 {
-		perspective := f32(y) / f32(horizon)
-		mid_point: f32 = 0.5 + (track_curve * math.pow(1 - perspective, 3))
-
-		road_width := 0.1 + (perspective * 0.8)
-		clip_width := road_width * 0.15
-		road_width *= 0.5
-
-		left_grass := round_i32((mid_point - road_width - clip_width) * f32(screen_buffer.width))
-		left_clip := round_i32((mid_point - road_width) * f32(screen_buffer.width))
-		right_clip := round_i32((mid_point + road_width) * f32(screen_buffer.width))
-		right_grass := round_i32((mid_point + road_width + clip_width) * f32(screen_buffer.width))
-
-		grass_color: u32 = (math.sin(20 * math.pow(1 - perspective, 3) + (pos * 0.1)) > 0 ? 0xFF00AA00 : 0xFF006600)
-		clip_color: u32 = (math.sin(80 * math.pow(1 - perspective, 2) + pos) > 0 ? 0xFFAA0000 : 0xFFFFFFFF)
-
-		for x: i32; x < i32(screen_buffer.width); x += 1 {
-			if x >= 0 && x < left_grass {
-				screen_buffer.buffer[i] = grass_color
-			}
-			if x >= left_grass && x < left_clip {
-				screen_buffer.buffer[i] = clip_color
-			}
-			if x >= left_clip && x < right_clip {
-				screen_buffer.buffer[i] = 0xFFAAAAAA
-			}
-			if x >= right_clip && x < right_grass {
-				screen_buffer.buffer[i] = clip_color
-			}
-			if x >= right_grass {
-				screen_buffer.buffer[i] = grass_color
-			}
-			i += 1
-		}
-	}
-
-	pos += 5
-}
-
-// Credit to:
-//  https://github.com/s-macke/VoxelSpace
-draw_voxel_space :: proc(screen_buffer: ^Bitmap) {
-}
-
 // TODO: Basic 24-bit .bmp-support. (can/should use stb libs in the future)
 // TODO: Basic bitmap functions. (sub-copy, alpha, etc)
 // TODO: Advanced bitmap functions. (line, rectangle, triangle, filled, etc)
 // TODO: Controller support, win/lin.
 // TODO: "Piano" scene. (after audio)
 
-scene_funcs := []proc(_: ^Bitmap){
-	draw_xor,
-	draw_slow_circles,
-	draw_fast_circles,
-	draw_plasma,
-	draw_line_tests,
-	draw_olc_race,
-	draw_voxel_space,
-}
+scene_funcs := []proc(_: ^Bitmap){draw_xor, draw_fast_circles, draw_plasma, draw_line_tests}
 
 // TODO: Text drawing.
 // TODO: VirtualAlloc'ed/shm memory, hooked into Odin's context.
@@ -376,16 +241,92 @@ app_update_and_render :: proc(screen_buffer: ^Bitmap, input: ^AppInput) {
 	} else if input.keyboard[AppInputKey.Num4].down {
 		scene_num = 3
 		mem.zero_slice(screen_buffer.buffer)
-	} else if input.keyboard[AppInputKey.Num5].down {
-		scene_num = 4
-		mem.zero_slice(screen_buffer.buffer)
-	} else if input.keyboard[AppInputKey.Num6].down {
-		scene_num = 5
-		mem.zero_slice(screen_buffer.buffer)
-	} else if input.keyboard[AppInputKey.Num7].down {
-		scene_num = 6
-		mem.zero_slice(screen_buffer.buffer)
 	}
 
 	scene_funcs[scene_num](screen_buffer)
+}
+
+glyph :: struct {
+	bitmap: [^]byte,
+	width:  int,
+	height: int,
+}
+
+@(init)
+initial :: proc() {
+	data, ok := os.read_entire_file_from_filename("C:\\Windows\\Fonts\\arialbd.ttf")
+	if !ok {
+		fmt.println("fail reading font")
+		return
+	}
+
+	font: stbtt.fontinfo
+	stbtt.InitFont(&font, &data[0], stbtt.GetFontOffsetForIndex(&data[0], 0))
+
+	max_h: int
+	msg := "Hello stb_truetype!"
+	glyphs := make(map[rune]glyph)
+	defer delete(glyphs)
+	for r in msg {
+		if !(r in glyphs) {
+			w, h: c.int
+			bitmap := stbtt.GetCodepointBitmap(
+				&font,
+				0,
+				stbtt.ScaleForPixelHeight(&font, 16),
+				r,
+				&w,
+				&h,
+				nil,
+				nil,
+			)
+			glyphs[r] = {
+				bitmap = bitmap,
+				width  = int(w),
+				height = int(h),
+			}
+			if int(h) > max_h {
+				max_h = int(h)
+			}
+		}
+	}
+	defer {
+		for r in glyphs {
+			defer stbtt.FreeBitmap(glyphs[r].bitmap, nil)
+		}
+	}
+
+	fmt.printf("%+v\nmax_h %d\n", glyphs, max_h)
+
+	chars := [?]rune{' ', '.', ':', 'i', 'o', 'V', 'M', '@'}
+	for y in 0 ..< max_h {
+		for r in msg {
+			g := glyphs[r]
+
+			if g.bitmap == nil {
+				for in 0 ..< 4 {
+					fmt.printf(" ")
+				}
+				fmt.printf(" ")
+				continue
+			}
+
+			offset := max_h - g.height
+			if y < offset || y >= max_h - 1 {
+				for x in 0 ..< g.width {
+					fmt.printf(" ")
+				}
+				fmt.printf(" ")
+				continue
+			}
+
+			i := (y - offset) * g.width
+			for x in 0 ..< g.width {
+				fmt.printf("%c", chars[g.bitmap[i + x] >> 5])
+			}
+			fmt.printf(" ")
+		}
+		fmt.println()
+	}
+	fmt.println()
 }

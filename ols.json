@@ -1,13 +1,10 @@
 {
-  "collections": [{ "name": "core", "path": "..\\Odin\\core" }],
-  "thread_pool_count": 4,
+  "collections": [
+    { "name": "core", "path": "D:\\Projects\\Odin\\core" },
+    { "name": "vendor", "path": "D:\\Projects\\Odin\\vendor" }
+  ],
   "enable_document_symbols": true,
-  "enable_semantic_tokens": false,
+  "enable_semantic_tokens": true,
   "enable_hover": true,
-  "enable_global_std": true,
-  "enable_snippets": true,
-  "formatter": {
-    "tabs": true,
-    "characters": 120
-  }
+  "enable_snippets": true
 }
