@@ -8,10 +8,21 @@ import "core:c"
 
 import "core:fmt"
 import stbtt "vendor:stb/truetype"
-//import "vendor:microui"
+import mu "vendor:microui"
 
-color_u32 :: #force_inline proc(r, g, b, a: u8) -> u32 {
+DEBUG_DRAW_UI_CALLS :: #config(DEBUG_DRAW_UI_CALLS, false)
+
+color_u32 :: proc {
+	color_u8_to_u32,
+	color_mu_color_to_u32,
+}
+
+color_u8_to_u32 :: #force_inline proc(r, g, b, a: u8) -> u32 {
 	return (u32(a) << 24) + (u32(r) << 16) + (u32(g) << 8) + u32(b)
+}
+
+color_mu_color_to_u32 :: #force_inline proc(c: mu.Color) -> u32 {
+	return (u32(c.a) << 24) + (u32(c.r) << 16) + (u32(c.g) << 8) + u32(c.b)
 }
 
 round_i32 :: #force_inline proc(v: f32) -> i32 {
@@ -26,38 +37,6 @@ abs :: proc(a: i32) -> i32 {
 clamp :: proc(a, min, max: i32) -> i32 {
 	t := (a < min ? min : a)
 	return t > max ? max : t
-}
-
-draw_line :: proc(bitmap: ^Bitmap, x1, y1, x2, y2: i32, color: u32) {
-	xx1 := clamp(x1, 0, i32(bitmap.width - 1))
-	yy1 := clamp(y1, 0, i32(bitmap.height - 1))
-	xx2 := clamp(x2, 0, i32(bitmap.width - 1))
-	yy2 := clamp(y2, 0, i32(bitmap.height - 1))
-
-	sx: i32 = (xx1 < xx2 ? 1 : -1)
-	sy: i32 = (yy1 < yy2 ? 1 : -1)
-	dx: i32 = abs(xx2 - xx1)
-	dy: i32 = -abs(yy2 - yy1)
-
-	x := xx1
-	y := yy1
-	e := dx + dy
-	for {
-		bitmap.buffer[(u32(y) * bitmap.width) + u32(x)] = color
-		if x == xx2 && y == yy2 {
-			break
-		}
-
-		e2 := e * 2
-		if e2 >= dy {
-			e += dy
-			x += sx
-		}
-		if e2 <= dx {
-			e += dx
-			y += sy
-		}
-	}
 }
 
 // h: 0-360, s: 0-1, v: 0-1
@@ -155,10 +134,7 @@ draw_plasma :: proc(bitmap: ^Bitmap) {
 		i: u32
 		for y: u32; y < Fixed_Height; y += 1 {
 			for x: u32; x < Fixed_Width; x += 1 {
-				c := u8(
-					(128 + (math.sin(f32(x) / 16) * 128) + 128 + (math.sin(f32(y) / 16) * 128)) /
-					2,
-				)
+				c := u8((128 + (math.sin(f32(x) / 16) * 128) + 128 + (math.sin(f32(y) / 16) * 128)) / 2)
 				buffer[i] = c
 				i += 1
 			}
@@ -223,6 +199,55 @@ draw_line_tests :: proc(screen_buffer: ^Bitmap) {
 
 scene_funcs := []proc(_: ^Bitmap){draw_xor, draw_fast_circles, draw_plasma, draw_line_tests}
 
+FONT_HEIGHT :: 24
+font_bitmap: Bitmap
+glyph_data: [96]stbtt.bakedchar
+ctx: mu.Context
+@(init)
+init_mu :: proc() {
+	{
+		when ODIN_OS == .Windows {
+			data, ok := os.read_entire_file_from_filename("C:\\Windows\\Fonts\\arialbd.ttf")
+		}
+		when ODIN_OS == .Linux {
+			data, ok := os.read_entire_file_from_filename("/usr/share/fonts/TTF/OpenSans-Regular.ttf")
+		}
+		if !ok {
+			fmt.println("fail reading font")
+			return
+		}
+
+		font: stbtt.fontinfo
+		stbtt.InitFont(&font, &data[0], stbtt.GetFontOffsetForIndex(&data[0], 0))
+		temp_bitmap: [256 * 256]byte
+		stbtt.BakeFontBitmap(&data[0], 0, FONT_HEIGHT, &temp_bitmap[0], 256, 256, 32, 96, &glyph_data[0])
+
+		fmt.printf("%+v\n", glyph_data)
+
+		font_bitmap.buffer = make([]u32, 256 * 256)
+		font_bitmap.width = 256
+		font_bitmap.height = 256
+		for i in 0 ..< len(temp_bitmap) {
+			font_bitmap.buffer[i] = color_u32(temp_bitmap[i], 0, 0, 255)
+		}
+	}
+
+	mu.init(&ctx)
+	ctx.text_width = proc(font: mu.Font, str: string) -> i32 {
+		// fmt.printf("checking text_width: %s\n", str)
+		width: i32
+		for r in str {
+			gd := &glyph_data[r - 32]
+			width += i32(gd.xadvance + 0.5)
+		}
+		return width
+	}
+	ctx.text_height = proc(font: mu.Font) -> i32 {
+		return FONT_HEIGHT
+	}
+}
+
+
 // TODO: Text drawing.
 // TODO: VirtualAlloc'ed/shm memory, hooked into Odin's context.
 app_update_and_render :: proc(screen_buffer: ^Bitmap, input: ^AppInput) {
@@ -244,6 +269,103 @@ app_update_and_render :: proc(screen_buffer: ^Bitmap, input: ^AppInput) {
 	}
 
 	scene_funcs[scene_num](screen_buffer)
+
+	draw_bitmap(screen_buffer, &font_bitmap, 400, 100)
+	draw_sub_bitmap(screen_buffer, &font_bitmap, 370, 100, 10, 10, 20, 20)
+
+	/*
+	input_mouse_move :: proc(ctx: ^Context, x, y: i32)
+	input_mouse_down :: proc(ctx: ^Context, x, y: i32, btn: Mouse)
+	input_mouse_up :: proc(ctx: ^Context, x, y: i32, btn: Mouse)
+	input_scroll :: proc(ctx: ^Context, x, y: i32)
+	input_key_down :: proc(ctx: ^Context, key: Key)
+	input_key_up :: proc(ctx: ^Context, key: Key)
+	input_text :: proc(ctx: ^Context, text: string)
+	*/
+
+	mu.begin(&ctx)
+	if mu.begin_window(&ctx, "Test Window", {x = 10, y = 10, w = 300, h = 400}) {
+		mu.label(&ctx, "Test label")
+		mu.button(&ctx, "Button!")
+		mu.end_window(&ctx)
+	}
+	mu.end(&ctx)
+
+	clip := [?]i32{0, 0, i32(screen_buffer.width), i32(screen_buffer.height)}
+	cmd: ^mu.Command = nil
+	for mu.next_command(&ctx, &cmd) {
+		switch c in cmd.variant {
+		case ^mu.Command_Jump:
+			fmt.println("Command_Jump")
+
+		case ^mu.Command_Text:
+			x := f32(c.pos[0])
+			y := f32(c.pos[1] + 18)
+			for r in c.str {
+				quad: stbtt.aligned_quad
+				stbtt.GetBakedQuad(&glyph_data[0], 256, 256, i32(r - 32), &x, &y, &quad, true)
+
+				if i32(quad.x0) < clip[0] || i32(quad.x0) > clip[2] {
+					continue
+				}
+				if i32(quad.y0) < clip[1] || i32(quad.y0) > clip[3] {
+					continue
+				}
+
+				sx1 := u32(quad.s0 * 256.0)
+				sy1 := u32(quad.t0 * 256.0)
+				sx2 := u32(quad.s1 * 256.0)
+				sy2 := u32(quad.t1 * 256.0)
+				// fmt.printf("%c #%+v -> %d, %d : %d, %d\n", r, quad, sx1, sy1, sx2, sy2)
+				draw_sub_bitmap(screen_buffer, &font_bitmap, i32(quad.x0), i32(quad.y0), sx1, sy1, sx2, sy2)
+
+				when DEBUG_DRAW_UI_CALLS {
+					draw_rect(
+						screen_buffer,
+						i32(quad.x0 + 0.5),
+						i32(quad.y0 + 0.5),
+						i32(quad.x1 + 0.5),
+						i32(quad.y1 + 0.5),
+						0xFFFF00FF,
+					)
+				}
+			}
+
+		case ^mu.Command_Rect:
+			x1, x2 := c.rect.x, c.rect.x + c.rect.w
+			y1, y2 := c.rect.y, c.rect.y + c.rect.h
+			for y in y1 ..= y2 {
+				if y < clip[1] || y > clip[3] {
+					continue
+				}
+				for x in x1 ..= x2 {
+					if x < clip[0] || x > clip[2] {
+						continue
+					}
+					screen_buffer.buffer[(y * i32(screen_buffer.width)) + x] = color_u32(c.color)
+				}
+			}
+			when DEBUG_DRAW_UI_CALLS {
+				draw_rect(screen_buffer, x1, y1, x2, y2, 0xFFFF0000)
+			}
+
+		case ^mu.Command_Icon:
+			when DEBUG_DRAW_UI_CALLS {
+				x1, x2 := c.rect.x, c.rect.x + c.rect.w
+				y1, y2 := c.rect.y, c.rect.y + c.rect.h
+				draw_rect(screen_buffer, x1, y1, x2, y2, 0xFF0000FF)
+			}
+
+		case ^mu.Command_Clip:
+			clip[0] = c.rect.x
+			clip[1] = c.rect.y
+			clip[2] = c.rect.x + c.rect.w
+			clip[3] = c.rect.y + c.rect.h
+			when DEBUG_DRAW_UI_CALLS {
+				draw_rect(screen_buffer, clip[0], clip[1], clip[2], clip[3], 0xFFFFAA00)
+			}
+		}
+	}
 }
 
 glyph :: struct {
@@ -253,7 +375,7 @@ glyph :: struct {
 }
 
 @(init)
-initial :: proc() {
+test_stbtt :: proc() {
 	when ODIN_OS == .Windows {
 		data, ok := os.read_entire_file_from_filename("C:\\Windows\\Fonts\\arialbd.ttf")
 	}
@@ -275,16 +397,7 @@ initial :: proc() {
 	for r in msg {
 		if !(r in glyphs) {
 			w, h: c.int
-			bitmap := stbtt.GetCodepointBitmap(
-				&font,
-				0,
-				stbtt.ScaleForPixelHeight(&font, 16),
-				r,
-				&w,
-				&h,
-				nil,
-				nil,
-			)
+			bitmap := stbtt.GetCodepointBitmap(&font, 0, stbtt.ScaleForPixelHeight(&font, 16), r, &w, &h, nil, nil)
 			glyphs[r] = {
 				bitmap = bitmap,
 				width  = int(w),

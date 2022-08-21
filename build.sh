@@ -14,6 +14,12 @@ for arg in "$@"; do
     -release)
       common_compiler_flags="-o:speed -show-timings -vet -strict-style -warnings-as-errors -verbose-errors"
     ;;
+    -debug-draw-timings)
+      compiler_defines="${compiler_defines} -define:DEBUG_DRAW_TIMINGS=true"
+    ;;
+    -debug-draw-ui-calls)
+      compiler_defines="${compiler_defines} -define:DEBUG_DRAW_UI_CALLS=true"
+    ;;
     *)
       echo "${bold_red}Unknown parameter \"${arg}\".${end}"
       exit -1
