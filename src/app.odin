@@ -83,8 +83,8 @@ draw_xor :: proc(bitmap: ^Bitmap) {
 	offset += 2
 }
 
-Fixed_Width :: 960
-Fixed_Height :: 540
+Fixed_Width :: 1280 / 2
+Fixed_Height :: 720 / 2
 
 draw_fast_circles :: proc(bitmap: ^Bitmap) {
 	@(static)
@@ -199,7 +199,7 @@ draw_line_tests :: proc(screen_buffer: ^Bitmap) {
 
 scene_funcs := []proc(_: ^Bitmap){draw_xor, draw_fast_circles, draw_plasma, draw_line_tests}
 
-FONT_HEIGHT :: 24
+FONT_HEIGHT :: 20
 font_bitmap: Bitmap
 glyph_data: [96]stbtt.bakedchar
 ctx: mu.Context
@@ -207,7 +207,7 @@ ctx: mu.Context
 init_mu :: proc() {
 	{
 		when ODIN_OS == .Windows {
-			data, ok := os.read_entire_file_from_filename("C:\\Windows\\Fonts\\arialbd.ttf")
+			data, ok := os.read_entire_file_from_filename("C:\\Windows\\Fonts\\arial.ttf")
 		}
 		when ODIN_OS == .Linux {
 			data, ok := os.read_entire_file_from_filename("/usr/share/fonts/TTF/OpenSans-Regular.ttf")
@@ -247,12 +247,15 @@ init_mu :: proc() {
 	}
 }
 
-
 // TODO: Text drawing.
 // TODO: VirtualAlloc'ed/shm memory, hooked into Odin's context.
 app_update_and_render :: proc(screen_buffer: ^Bitmap, input: ^AppInput) {
 	@(static)
 	scene_num := 0
+	@(static)
+	mouse_x: i32
+	@(static)
+	mouse_y: i32
 
 	if input.keyboard[AppInputKey.Num1].down {
 		scene_num = 0
@@ -271,25 +274,58 @@ app_update_and_render :: proc(screen_buffer: ^Bitmap, input: ^AppInput) {
 	scene_funcs[scene_num](screen_buffer)
 
 	draw_bitmap(screen_buffer, &font_bitmap, 400, 100)
-	draw_sub_bitmap(screen_buffer, &font_bitmap, 370, 100, 10, 10, 20, 20)
+
+	mx: i32
+	my: i32
+	if input.mouse_x > 0 && input.mouse_x < i32(screen_buffer.width) - 10 {
+		mx = input.mouse_x
+	}
+	if input.mouse_y > 0 && input.mouse_y < i32(screen_buffer.height) - 10 {
+		my = input.mouse_y
+	}
+	if mx != mouse_x || my != mouse_y {
+		mu.input_mouse_move(&ctx, mx, my)
+	}
+
+	if input.mouse_button[0].transition {
+		if input.mouse_button[0].down {
+			mu.input_mouse_down(&ctx, mx, my, .LEFT)
+		} else {
+			mu.input_mouse_up(&ctx, mx, my, .LEFT)
+		}
+	}
+	mouse_x, mouse_y = mx, my
+
 
 	/*
-	input_mouse_move :: proc(ctx: ^Context, x, y: i32)
-	input_mouse_down :: proc(ctx: ^Context, x, y: i32, btn: Mouse)
-	input_mouse_up :: proc(ctx: ^Context, x, y: i32, btn: Mouse)
-	input_scroll :: proc(ctx: ^Context, x, y: i32)
-	input_key_down :: proc(ctx: ^Context, key: Key)
-	input_key_up :: proc(ctx: ^Context, key: Key)
-	input_text :: proc(ctx: ^Context, text: string)
-	*/
+  input_scroll :: proc(ctx: ^Context, x, y: i32)
+  input_key_down :: proc(ctx: ^Context, key: Key)
+  input_key_up :: proc(ctx: ^Context, key: Key)
+  input_text :: proc(ctx: ^Context, text: string)
+  */
+
+	draw_rect(
+		screen_buffer,
+		mouse_x,
+		mouse_y,
+		mouse_x + 10,
+		mouse_y + 10,
+		0xFFFF00FF if input.mouse_button[0].down else 0xFFFF0000,
+	)
 
 	mu.begin(&ctx)
-	if mu.begin_window(&ctx, "Test Window", {x = 10, y = 10, w = 300, h = 400}) {
+	if mu.begin_window(&ctx, "Test Window", {x = 10, y = 10, w = 200, h = 200}) {
 		mu.label(&ctx, "Test label")
 		mu.button(&ctx, "Button!")
 		mu.end_window(&ctx)
 	}
+	if mu.begin_window(&ctx, "Test Slider", {x = 100, y = 20, w = 200, h = 200}) {
+		value := f32(650)
+		mu.slider(&ctx, &value, 42, 1337, 10)
+		mu.end_window(&ctx)
+	}
 	mu.end(&ctx)
+
 
 	clip := [?]i32{0, 0, i32(screen_buffer.width), i32(screen_buffer.height)}
 	cmd: ^mu.Command = nil
@@ -300,15 +336,15 @@ app_update_and_render :: proc(screen_buffer: ^Bitmap, input: ^AppInput) {
 
 		case ^mu.Command_Text:
 			x := f32(c.pos[0])
-			y := f32(c.pos[1] + 18)
+			y := f32(c.pos[1] + 16)
 			for r in c.str {
 				quad: stbtt.aligned_quad
 				stbtt.GetBakedQuad(&glyph_data[0], 256, 256, i32(r - 32), &x, &y, &quad, true)
 
-				if i32(quad.x0) < clip[0] || i32(quad.x0) > clip[2] {
+				if i32(quad.x0) < clip[0] || i32(quad.x1) > clip[2] {
 					continue
 				}
-				if i32(quad.y0) < clip[1] || i32(quad.y0) > clip[3] {
+				if i32(quad.y0) < clip[1] || i32(quad.y1) > clip[3] {
 					continue
 				}
 
@@ -319,27 +355,29 @@ app_update_and_render :: proc(screen_buffer: ^Bitmap, input: ^AppInput) {
 				// fmt.printf("%c #%+v -> %d, %d : %d, %d\n", r, quad, sx1, sy1, sx2, sy2)
 				draw_sub_bitmap(screen_buffer, &font_bitmap, i32(quad.x0), i32(quad.y0), sx1, sy1, sx2, sy2)
 
-				when DEBUG_DRAW_UI_CALLS {
-					draw_rect(
-						screen_buffer,
-						i32(quad.x0 + 0.5),
-						i32(quad.y0 + 0.5),
-						i32(quad.x1 + 0.5),
-						i32(quad.y1 + 0.5),
-						0xFFFF00FF,
-					)
-				}
+				/*
+        when DEBUG_DRAW_UI_CALLS {
+          draw_rect(
+            screen_buffer,
+            i32(quad.x0 + 0.5),
+            i32(quad.y0 + 0.5),
+            i32(quad.x1 + 0.5),
+            i32(quad.y1 + 0.5),
+            0xFFFF00FF,
+          )
+        }
+        */
 			}
 
 		case ^mu.Command_Rect:
 			x1, x2 := c.rect.x, c.rect.x + c.rect.w
 			y1, y2 := c.rect.y, c.rect.y + c.rect.h
-			for y in y1 ..= y2 {
-				if y < clip[1] || y > clip[3] {
+			for y in y1 ..< y2 {
+				if y < clip[1] || y >= clip[3] {
 					continue
 				}
-				for x in x1 ..= x2 {
-					if x < clip[0] || x > clip[2] {
+				for x in x1 ..< x2 {
+					if x < clip[0] || x >= clip[2] {
 						continue
 					}
 					screen_buffer.buffer[(y * i32(screen_buffer.width)) + x] = color_u32(c.color)

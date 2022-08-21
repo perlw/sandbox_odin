@@ -182,8 +182,8 @@ main :: proc() {
 	}
 	defer windows.DestroyWindow(window)
 
-	backbuffer_width :: 1920 / 2
-	backbuffer_height :: 1080 / 2
+	backbuffer_width :: 1280 / 2
+	backbuffer_height :: 720 / 2
 	backbuffer_index: u32
 	backbuffers: [2]Backbuffer
 	resize_backbuffer(&backbuffers[0], backbuffer_width, backbuffer_height)
@@ -203,7 +203,9 @@ main :: proc() {
 		debug_highest_timing := f32(1)
 	}
 
-	input: AppInput
+	input: [2]AppInput
+	curr_input := &input[0]
+	prev_input := &input[1]
 	dc := windows.GetDC(window)
 	defer windows.ReleaseDC(window, dc)
 	for global_is_running {
@@ -224,7 +226,7 @@ main :: proc() {
 				}
 
 				if translated_key, ok := input_key_translation[key_code]; ok {
-					input.keyboard[translated_key].down = ((message.lParam & (1 << 31)) == 0)
+					curr_input.keyboard[translated_key].down = ((message.lParam & (1 << 31)) == 0)
 				}
 
 			case:
@@ -233,6 +235,15 @@ main :: proc() {
 			}
 		}
 
+		mouse_point: windows.POINT
+		windows.GetCursorPos(&mouse_point)
+		windows.ScreenToClient(window, &mouse_point)
+		curr_input.mouse_x = mouse_point.x / 2
+		curr_input.mouse_y = mouse_point.y / 2
+
+		curr_input.mouse_button[0].down = ((int(windows.GetKeyState(windows.VK_LBUTTON)) & (1 << 15)) != 0)
+		curr_input.mouse_button[0].transition = (curr_input.mouse_button[0].down != prev_input.mouse_button[0].down)
+
 		backbuffer := &backbuffers[backbuffer_index]
 		backbuffer_index = (backbuffer_index + 1) % 2
 		screen_buffer := Bitmap {
@@ -240,13 +251,16 @@ main :: proc() {
 			width  = backbuffer.width,
 			height = backbuffer.height,
 		}
+
 		when DEBUG_DRAW_TIMINGS {
 			update_and_render_timing_start := get_clock_value()
 		}
-		app_update_and_render(&screen_buffer, &input)
+		app_update_and_render(&screen_buffer, curr_input)
 		when DEBUG_DRAW_TIMINGS {
 			update_and_render_timing_stop := get_clock_value()
 		}
+
+		curr_input, prev_input = prev_input, curr_input
 
 		when DEBUG_DRAW_TIMINGS {
 			pix_step := 128 / debug_highest_timing

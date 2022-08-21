@@ -16,10 +16,13 @@ AppInputKey :: enum u8 {
 }
 
 AppButtonState :: struct {
-	transitions: int,
-	down:        bool,
+	transition: bool,
+	down:       bool,
 }
 
 AppInput :: struct {
-	keyboard: [255]AppButtonState,
+	keyboard:     [255]AppButtonState,
+	mouse_button: [5]AppButtonState,
+	mouse_x:      i32,
+	mouse_y:      i32,
 }

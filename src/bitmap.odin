@@ -64,24 +64,17 @@ draw_bitmap :: proc(dest, src: ^Bitmap, dx, dy: i32) {
 draw_sub_bitmap :: proc(dest, src: ^Bitmap, dx, dy: i32, sx1, sy1, sx2, sy2: u32) {
 	dxx := u32(dx)
 	dyy := u32(dy)
-	/*
-	// old bounds/rect checkfix, skipped for now
-	off_x := u32(-dx if dx < 0 else 0)
-	off_y := u32(-dy if dy < 0 else 0)
 	sw := sx2 - sx1
 	sh := sy2 - sy1
-	end_x := sx2 if dxx + sw < dest.width else sx2 - (dxx + sw - dest.width)
-	end_y := sy2 if dyy + sh < dest.height else sy2 - (dyy + sh - dest.height)
-	for y in off_y ..< end_x {
-		for x in off_x ..< end_y {
-	*/
 
-	sw := sx2 - sx1
-	sh := sy2 - sy1
-	for y in 0 ..< sh {
+	x1 := u32(0 if dx >= 0 else -dx)
+	x2 := sw if dxx + sw < dest.width else sw - (dxx + sw - dest.width)
+	y1 := u32(0 if dy >= 0 else -dy)
+	y2 := sh if dyy + sh < dest.height else sh - (dyy + sh - dest.height)
+	for y in y1 ..< y2 {
 		si := (y + sy1) * src.width
 		di := (y + dyy) * dest.width
-		for x in 0 ..< sw {
+		for x in x1 ..< x2 {
 			dest.buffer[di + (x + dxx)] = src.buffer[si + (x + sx1)]
 		}
 	}
