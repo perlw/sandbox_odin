@@ -15,10 +15,10 @@ set common_compiler_flags=-debug -pdb-name:%pdb_name% -show-timings -vet -strict
 for %%x in (%*) do (
   if "%%~x" == "-release" (
     set common_compiler_flags=-o:speed -show-timings -vet -strict-style -warnings-as-errors -verbose-errors
-  )else(
+  ) else (
     if "%%~x" == "-debug-draw-timings" (
       compiler_defines="${compiler_defines} -define:DEBUG_DRAW_TIMINGS=true"
-    )else (
+    ) else (
       if "%%~x" == "-debug-draw-ui-calls" (
         set compiler_defines=%compiler_defines% -define:DEBUG_DRAW_UI_CALLS=true
       ) else (
