@@ -1,14 +1,14 @@
 package main
 
+import "core:c"
 import "core:math"
 import "core:math/linalg"
 import "core:mem"
 import "core:os"
-import "core:c"
 
 import "core:fmt"
-import stbtt "vendor:stb/truetype"
 import mu "vendor:microui"
+import stbtt "vendor:stb/truetype"
 
 DEBUG_DRAW_UI_CALLS :: #config(DEBUG_DRAW_UI_CALLS, false)
 
@@ -460,7 +460,7 @@ test_stbtt :: proc() {
 			g := glyphs[r]
 
 			if g.bitmap == nil {
-				for in 0 ..< 4 {
+				for _ in 0 ..< 4 {
 					fmt.printf(" ")
 				}
 				fmt.printf(" ")

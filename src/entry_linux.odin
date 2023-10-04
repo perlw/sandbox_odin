@@ -35,8 +35,7 @@ resize_backbuffer :: proc(
 	backbuffer: ^Backbuffer,
 	connection: ^xcb.Connection,
 	window: xcb.Window,
-	width,
-	height: u16,
+	width, height: u16,
 ) {
 	if backbuffer.shm_seg_id == 0 {
 		backbuffer.shm_seg_id = xcbshm.Seg(xcb.generate_id(connection))
@@ -156,8 +155,8 @@ main :: proc() {
 	xcb.flush(connection)
 
 	// NOTE: SHM support check.
-	if reply := xcbshm.query_version_reply(connection, xcbshm.query_version(connection), nil); reply == nil ||
-		   reply.shared_pixmaps == 0 {
+	if reply := xcbshm.query_version_reply(connection, xcbshm.query_version(connection), nil);
+	reply == nil || reply.shared_pixmaps == 0 {
 		fmt.printf("Shm missing?\n")
 	} else {
 		fmt.printf("Shm: %v\n", reply)
@@ -241,7 +240,6 @@ main :: proc() {
 
 					if translated_key, ok := input_key_translation[key_sym]; ok {
 						//fmt.printf("pressed a valid key, %v\n", translated_key)
-						input.keyboard[translated_key].transitions += 1
 						input.keyboard[translated_key].down = true
 					}
 				} else {
@@ -250,8 +248,7 @@ main :: proc() {
 
 					// fmt.printf("KEY UP: %v %d ?= %d\n", evt, key_sym, X11.Key_Code.Escape)
 					if translated_key, ok := input_key_translation[key_sym]; ok {
-						input.keyboard[translated_key].transitions += 1
-						input.keyboard[translated_key].down = (input.keyboard[translated_key].transitions % 2 != 0)
+						input.keyboard[translated_key].down = false
 						// fmt.printf("released a valid key, %v, new state: %d\n", translated_key, input.keyboard[translated_key].down)
 					}
 				}
